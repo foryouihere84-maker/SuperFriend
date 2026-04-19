@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\"c:/Users/iherefor/Desktop/project/SuperFriend/src/main/resources/mcp-python/venv/Scripts/python.exe\" -c \"import mcp_server_fetch; import mcp_server_time; print\\('OK'\\)\")",
+      "Bash(node \"./src/main/resources/mcp-servers/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js\" \"C:/Users/iherefor\")",
+      "Bash(node \"src/main/resources/mcp-servers/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js\" \"C:/Users/iherefor\")",
+      "Bash(timeout 5 node \"src/main/resources/mcp-servers/node_modules/@modelcontextprotocol/server-filesystem/dist/index.js\" \"C:/Users/iherefor\")",
+      "Bash(\"c:/Users/iherefor/Desktop/project/SuperFriend/src/main/resources/mcp-local/python/venv/Scripts/pip.exe\" show:*)"
+    ]
+  }
+}

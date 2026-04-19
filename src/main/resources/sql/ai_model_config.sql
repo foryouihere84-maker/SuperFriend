@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS ai_model_config (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    config_id VARCHAR(50) NOT NULL UNIQUE COMMENT '配置唯一标识（UUID）',
+    user_id BIGINT NOT NULL COMMENT '关联用户ID，0表示系统默认',
+    name VARCHAR(100) NOT NULL COMMENT '配置名称（如 DeepSeek Chat）',
+    provider VARCHAR(50) NOT NULL COMMENT '提供商（openai/deepseek/ollama/custom）',
+    api_url VARCHAR(500) NOT NULL COMMENT 'API 地址',
+    api_key VARCHAR(500) NOT NULL COMMENT 'API Key（加密存储）',
+    model_id VARCHAR(200) NOT NULL COMMENT '模型标识（如 deepseek-chat）',
+    max_tokens INT DEFAULT 4096 COMMENT '最大 token 数',
+    temperature DECIMAL(3,2) DEFAULT 0.70 COMMENT '温度参数',
+    is_default TINYINT(1) DEFAULT 0 COMMENT '是否为当前用户的默认模型',
+    is_enabled TINYINT(1) DEFAULT 1 COMMENT '是否启用',
+    sort_order INT DEFAULT 0 COMMENT '排序顺序',
+    extra_params TEXT DEFAULT NULL COMMENT '额外参数（JSON）',
+    created_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_user_id (user_id),
+    INDEX idx_provider (provider),
+    INDEX idx_is_default (user_id, is_default)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI 模型配置表';
