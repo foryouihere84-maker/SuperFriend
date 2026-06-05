@@ -173,9 +173,13 @@ public class McpServiceLauncher {
             return config;
         }
 
+        // 自动检测系统可用的 Python 命令
+        String pythonCommand = detectPythonCommand();
+        log.info("[{}] 检测到 Python 命令: {}", serverName, pythonCommand);
+
         // 替换路径占位符
         McpServerConfig newConfig = new McpServerConfig();
-        newConfig.setCommand(config.getCommand());
+        newConfig.setCommand(pythonCommand);
         newConfig.setArgs(Arrays.stream(args)
             .map(this::replacePlaceholders)
             .toArray(String[]::new));
@@ -185,6 +189,58 @@ public class McpServiceLauncher {
         newConfig.setDescription(config.getDescription());
 
         return newConfig;
+    }
+
+    /**
+     * 检测系统可用的 Python 命令
+     * 优先级：python3 > python
+     */
+    private String detectPythonCommand() {
+        String osName = System.getProperty("os.name").toLowerCase();
+
+        // Windows 上优先使用 python
+        if (osName.contains("win")) {
+            if (isCommandAvailable("python")) {
+                return "python";
+            }
+            if (isCommandAvailable("python3")) {
+                return "python3";
+            }
+        } else {
+            // Linux/Mac 上优先使用 python3
+            if (isCommandAvailable("python3")) {
+                return "python3";
+            }
+            if (isCommandAvailable("python")) {
+                return "python";
+            }
+        }
+
+        // 都不可用，返回配置中的原始值
+        log.warn("未检测到可用的 Python 命令");
+        return "python";
+    }
+
+    /**
+     * 检查命令是否可用
+     */
+    private boolean isCommandAvailable(String command) {
+        try {
+            ProcessBuilder pb;
+            String osName = System.getProperty("os.name").toLowerCase();
+            if (osName.contains("win")) {
+                pb = new ProcessBuilder("cmd", "/c", command, "--version");
+            } else {
+                pb = new ProcessBuilder(command, "--version");
+            }
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            int exitCode = process.waitFor();
+            process.destroy();
+            return exitCode == 0;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /**

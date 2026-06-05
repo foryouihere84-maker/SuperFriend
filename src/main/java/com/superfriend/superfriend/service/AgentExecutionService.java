@@ -17,6 +17,7 @@ import com.superfriend.superfriend.entity.ChatCompression;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
@@ -114,11 +115,7 @@ public class AgentExecutionService {
 
     @Autowired
     @Lazy
-    private KnowledgeExtractorService knowledgeExtractorService;
-
-    @Autowired
-    @Lazy
-    private UserProfileService userProfileService;
+    private MemoryPalaceService memoryPalaceService;
 
     @Autowired
     @Lazy
@@ -142,16 +139,32 @@ public class AgentExecutionService {
 
     @Autowired
     @Lazy
+    private SessionFileIndexService sessionFileIndexService;
+
+    @Autowired
+    @Lazy
     private com.superfriend.superfriend.agent.planner.TaskAnalyzer taskAnalyzer;
+
+    @Autowired
+    @Lazy
+    private BashSandboxService bashSandboxService;
+
+    @Autowired
+    @Lazy
+    private SandboxExecutionGuideService sandboxExecutionGuideService;
+
+    @Autowired
+    @Qualifier("parallelToolExecutor")
+    private ExecutorService parallelExecutor;
 
     private static final int DEFAULT_MAX_ITERATIONS = 15;
     private static final int DEFAULT_MAX_CONSECUTIVE_ERRORS = 10;
-    private static final int DEFAULT_REPEAT_CALL_THRESHOLD = 3;
+    // 提高重复调用阈值，允许模型在成功执行后继续调用其他工具（如生成文件后发送文件）
+    private static final int DEFAULT_REPEAT_CALL_THRESHOLD = 5;
     private static final long DEFAULT_TOOL_TIMEOUT_MS = 120000;
     private static final int MIN_RESULT_FOR_DIRECT_ANSWER = 200;
     private static final int MAX_REASONING_STEPS = 100;
-
-    private final ExecutorService parallelExecutor = Executors.newFixedThreadPool(6);
+    private static final long SEARCH_TIMEOUT_MS = 30000; // Web搜索超时30秒
 
     private enum QueryType {
         FACTUAL,
@@ -176,8 +189,6 @@ public class AgentExecutionService {
         private boolean enableKnowledgeExtraction = false;
         private String chatMode;
         private com.superfriend.superfriend.entity.Prompt.Mode promptMode = com.superfriend.superfriend.entity.Prompt.Mode.MCP;
-        // 【改进】可配置的模式切换阈值
-        private int upgradeToPlanExecuteThreshold = 5;  // 连续错误达到此值时升级到 Plan-Execute
     }
 
     @Data
@@ -225,9 +236,10 @@ public class AgentExecutionService {
 
         private int currentIteration = 0;
         private int consecutiveErrors = 0;
-        private int consecutiveNoProgress = 0;  // 用于停滞检测
-        private int modeSwitchCount = 0;  // 【改进】模式切换计数器
-        private static final int MAX_MODE_SWITCHES = 2;  // 最大切换次数
+        private int consecutiveNoProgress = 0;
+        private int consecutiveCorrections = 0;
+        private int lastEvidenceSize = 0;
+        private int lastToolCallCount = 0;
         private double progress = 0.0;
         private String currentPhase = "initializing";
         private boolean executionEnded = false;
@@ -243,13 +255,13 @@ public class AgentExecutionService {
 
         // URL访问历史追踪 - 跨工具共享（线程安全）
         private final Set<String> visitedUrls = Collections.synchronizedSet(new LinkedHashSet<>());
-        private final Map<String, String> urlAccessResults = new ConcurrentHashMap<>(); // url -> 结果摘要
-        private final Map<String, Long> urlAccessTimestamps = new ConcurrentHashMap<>(); // url -> 访问时间戳
-        private final Map<String, Integer> urlVisitCounts = new ConcurrentHashMap<>(); // url -> 访问次数（用于强制终止检测）
+        private final Map<String, String> urlAccessResults = new ConcurrentHashMap<>();
+        private final Map<String, Long> urlAccessTimestamps = new ConcurrentHashMap<>();
+        private final Map<String, Integer> urlVisitCounts = new ConcurrentHashMap<>();
 
         // 内存保护：限制URL历史大小
         private static final int MAX_URL_HISTORY = 50;
-        private static final int MAX_URL_RESULT_LENGTH = 500; // 结果摘要最大长度
+        private static final int MAX_URL_RESULT_LENGTH = 500;
 
         // Dynamic configuration from DynamicConfigManager
         private com.superfriend.superfriend.agent.config.DynamicConfigManager.SessionConfig sessionConfig;
@@ -264,6 +276,10 @@ public class AgentExecutionService {
 
         // 【改进】缓存任务分析结果，避免重复分析
         private com.superfriend.superfriend.agent.planner.TaskAnalysis taskAnalysis;
+
+        // 【新增】沙箱会话管理
+        private String bashSandboxSessionId;
+        private String bashSandboxWorkingDir;
 
         public ExecutionContext(String sessionId, String userMessage, Long userId) {
             this.sessionId = sessionId;
@@ -361,7 +377,6 @@ public class AgentExecutionService {
 
             // 内存保护：限制历史大小
             if (visitedUrls.size() >= MAX_URL_HISTORY && !visitedUrls.contains(normalizedUrl)) {
-                // 移除最旧的条目（LinkedHashSet保持插入顺序）
                 synchronized (visitedUrls) {
                     if (!visitedUrls.isEmpty()) {
                         String oldest = visitedUrls.iterator().next();
@@ -369,14 +384,12 @@ public class AgentExecutionService {
                         urlAccessResults.remove(oldest);
                         urlAccessTimestamps.remove(oldest);
                         urlVisitCounts.remove(oldest);
-                        log.debug("URL历史已满，移除最旧条目: {}", oldest);
                     }
                 }
             }
 
             visitedUrls.add(normalizedUrl);
 
-            // 限制结果摘要长度
             String trimmedSummary = resultSummary;
             if (trimmedSummary != null && trimmedSummary.length() > MAX_URL_RESULT_LENGTH) {
                 trimmedSummary = trimmedSummary.substring(0, MAX_URL_RESULT_LENGTH) + "...";
@@ -546,17 +559,68 @@ public class AgentExecutionService {
 
         /**
          * 检查执行是否停滞（连续无进展）
+         * 【增强版】细粒度停滞检测，减少误判
          */
         private boolean isExecutionStalled() {
-            return consecutiveNoProgress >= 3;
+            // 1. 基础检查：连续无进展次数（提高阈值到5，避免正常多步骤任务被误判）
+            if (consecutiveNoProgress >= 5) {
+                log.debug("停滞检测: 连续无进展次数 {}", consecutiveNoProgress);
+                return true;
+            }
+
+            // 2. 证据增长检查：如果迭代多次但证据没有增长
+            // 提高迭代阈值到10，给复杂任务更多空间
+            int currentEvidenceSize = evidenceStore.size();
+            if (currentIteration > 10 && currentEvidenceSize == lastEvidenceSize && currentEvidenceSize > 0) {
+                log.debug("停滞检测: 迭代 {} 次但证据未增长 ({} 个)", currentIteration, currentEvidenceSize);
+                return true;
+            }
+            lastEvidenceSize = currentEvidenceSize;
+
+            // 3. 工具调用重复模式检查（提高模式长度到3，减少两步合理流程的误判）
+            if (hasRepeatingToolPattern(3)) {
+                log.debug("停滞检测: 检测到重复工具调用模式");
+                return true;
+            }
+
+            // 4. URL 访问循环检查（提高阈值到4次）
+            if (isStuckInUrlLoop()) {
+                log.debug("停滞检测: 陷入 URL 访问循环");
+                return true;
+            }
+
+            // 5. 访问多个 URL 但获取信息较少（提高阈值）
+            if (visitedUrls.size() > 8 && evidenceStore.size() < 2) {
+                log.debug("停滞检测: 访问了 {} 个 URL 但仅有 {} 个证据", visitedUrls.size(), evidenceStore.size());
+                return true;
+            }
+
+            return false;
+        }
+
+        /**
+         * 检测重复的工具调用模式
+         * @param patternLength 模式长度
+         */
+        private boolean hasRepeatingToolPattern(int patternLength) {
+            if (recentToolCallSignatures.size() < patternLength * 2) {
+                return false;
+            }
+
+            int size = recentToolCallSignatures.size();
+            List<String> recent = new ArrayList<>(recentToolCallSignatures.subList(size - patternLength, size));
+            List<String> previous = new ArrayList<>(recentToolCallSignatures.subList(size - patternLength * 2, size - patternLength));
+
+            return recent.equals(previous);
         }
 
         /**
          * 检查是否陷入URL重复访问循环
          */
         public boolean isStuckInUrlLoop() {
-            // 如果有URL被访问超过2次，认为陷入循环
-            return urlVisitCounts.values().stream().anyMatch(count -> count > 2);
+            // 如果有URL被访问超过3次，认为陷入循环
+            // 阈值从2提高到3，因为某些场景（如先获取页面再提取数据）确实需要多次访问
+            return urlVisitCounts.values().stream().anyMatch(count -> count > 3);
         }
 
         /**
@@ -851,18 +915,10 @@ public class AgentExecutionService {
             // 【改进】智能选择执行模式
             if (!config.isForceReactMode() && shouldUseTaskPlanner(ctx)) {
                 log.info("[sessionId={}] 智能判断为复杂任务，使用 Plan-Execute 模式", ctx.getSessionId());
-                ctx.setModeSwitchCount(ctx.getModeSwitchCount() + 1);
                 if (executeWithTaskPlanner(ctx, config, onResponse)) {
                     return;
                 }
-                // 【改进】检查切换次数限制
-                if (ctx.getModeSwitchCount() >= ExecutionContext.MAX_MODE_SWITCHES) {
-                    log.warn("[sessionId={}] 模式切换次数达到上限 {}，强制使用 ReAct 模式",
-                        ctx.getSessionId(), ExecutionContext.MAX_MODE_SWITCHES);
-                } else {
-                    log.info("[sessionId={}] Plan-Execute 模式失败，回退到 ReAct 模式 (切换次数: {}/{})",
-                        ctx.getSessionId(), ctx.getModeSwitchCount(), ExecutionContext.MAX_MODE_SWITCHES);
-                }
+                log.info("[sessionId={}] Plan-Execute 模式失败，回退到 ReAct 模式", ctx.getSessionId());
             }
 
             log.info("[sessionId={}] 使用 ReAct 循环模式，maxIterations={}", ctx.getSessionId(), config.getMaxIterations());
@@ -999,18 +1055,10 @@ public class AgentExecutionService {
             // 【改进】智能选择执行模式
             if (!config.isForceReactMode() && shouldUseTaskPlanner(ctx)) {
                 log.info("[sessionId={}] 智能判断为复杂任务，使用 Plan-Execute 模式", ctx.getSessionId());
-                ctx.setModeSwitchCount(ctx.getModeSwitchCount() + 1);
                 if (executeWithTaskPlanner(ctx, config, onResponse)) {
                     return;
                 }
-                // 【改进】检查切换次数限制
-                if (ctx.getModeSwitchCount() >= ExecutionContext.MAX_MODE_SWITCHES) {
-                    log.warn("[sessionId={}] 模式切换次数达到上限 {}，强制使用 ReAct 模式",
-                        ctx.getSessionId(), ExecutionContext.MAX_MODE_SWITCHES);
-                } else {
-                    log.info("[sessionId={}] Plan-Execute 模式失败，回退到 ReAct 模式 (切换次数: {}/{})",
-                        ctx.getSessionId(), ctx.getModeSwitchCount(), ExecutionContext.MAX_MODE_SWITCHES);
-                }
+                log.info("[sessionId={}] Plan-Execute 模式失败，回退到 ReAct 模式", ctx.getSessionId());
             }
 
             log.info("[sessionId={}] 使用 ReAct 循环模式，maxIterations={}", ctx.getSessionId(), config.getMaxIterations());
@@ -1067,21 +1115,29 @@ public class AgentExecutionService {
         // 清理最近工具调用签名（避免重复检测误判）
         ctx.getRecentToolCallSignatures().clear();
 
-        // 清理证据存储中的 Plan-Execute 相关数据
+        // 只清理 Plan-Execute 相关的 evidence，保留其他有用的证据
         ctx.getEvidenceStore().remove("plan_execution");
         ctx.getEvidenceStore().remove("current_step");
         ctx.getEvidenceStore().remove("plan_result");
 
-        // 清理工作内存中的临时数据
-        ctx.getWorkingMemory().clear();
+        // 保留工作内存中有价值的数据（已获取的文件内容、分析结果等）
+        // 只清理 Plan-Execute 产生的临时状态
+        Map<String, Object> workingMemory = ctx.getWorkingMemory();
+        List<String> planKeysToRemove = new ArrayList<>();
+        for (String key : workingMemory.keySet()) {
+            if (key.startsWith("plan_") || key.startsWith("task_") || key.startsWith("step_")) {
+                planKeysToRemove.add(key);
+            }
+        }
+        for (String key : planKeysToRemove) {
+            workingMemory.remove(key);
+        }
 
-        // 清理 URL 访问历史（避免重复访问检测误判）
-        ctx.getVisitedUrls().clear();
-        ctx.getUrlAccessResults().clear();
+        // 保留 URL 访问历史，避免 ReAct 重复访问已知 URL
+        // 只清理 URL 访问时间戳（避免过期检测误判）
         ctx.getUrlAccessTimestamps().clear();
-        ctx.getUrlVisitCounts().clear();
 
-        // 处理消息列表：移除 Plan-Execute 模式的中间消息
+        // 处理消息列表：精简但保留关键上下文
         List<Map<String, Object>> messages = ctx.getMessages();
         List<Map<String, Object>> cleanedMessages = new ArrayList<>();
 
@@ -1115,6 +1171,15 @@ public class AgentExecutionService {
             // 保留 tool 响应消息
             else if ("tool".equals(role)) {
                 cleanedMessages.add(msg);
+            }
+            // 保留包含实质内容的 assistant 消息（非 Plan-Execute 的计划步骤）
+            else if ("assistant".equals(role) && !msg.containsKey("tool_calls")) {
+                String content = msg.get("content") != null ? msg.get("content").toString() : "";
+                // 跳过纯计划步骤消息
+                if (!content.contains("## 任务计划") && !content.contains("## 执行步骤")
+                    && !content.contains("plan_step") && content.length() > 0) {
+                    cleanedMessages.add(msg);
+                }
             }
         }
 
@@ -1425,10 +1490,47 @@ public class AgentExecutionService {
         // 使用 MessageContentBuilder 处理历史消息（支持多模态）
         ctx.getMessages().addAll(messageContentBuilder.buildHistoryMessages(request));
 
+        // 【改进】使用优化后的提示词（如果有）
+        Object userContent = ctx.getEffectiveUserMessageContent();
+        UserIntent intent = ctx.getUserIntent();
+
+        // 如果有优化后的提示词，替换用户消息中的文本部分
+        if (intent != null && intent.getOptimizedPrompt() != null && !intent.getOptimizedPrompt().isEmpty()) {
+            String optimizedPrompt = intent.getOptimizedPrompt();
+            log.info("[sessionId={}] 使用优化后的提示词: {}",
+                ctx.getSessionId(),
+                optimizedPrompt.length() > 100 ? optimizedPrompt.substring(0, 100) + "..." : optimizedPrompt);
+
+            // 如果是多模态消息（List），需要替换其中的文本部分
+            if (userContent instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> contentList = new ArrayList<>((List<Map<String, Object>>) userContent);
+                boolean textReplaced = false;
+                for (Map<String, Object> item : contentList) {
+                    if ("text".equals(item.get("type"))) {
+                        item.put("text", optimizedPrompt);
+                        textReplaced = true;
+                        break;
+                    }
+                }
+                // 如果没有文本项，添加一个
+                if (!textReplaced) {
+                    Map<String, Object> textItem = new HashMap<>();
+                    textItem.put("type", "text");
+                    textItem.put("text", optimizedPrompt);
+                    contentList.add(0, textItem);
+                }
+                userContent = contentList;
+            } else if (userContent instanceof String) {
+                // 纯文本消息，直接替换
+                userContent = optimizedPrompt;
+            }
+        }
+
         // 添加用户消息（使用多模态内容）
         Map<String, Object> userMessage = new HashMap<>();
         userMessage.put("role", "user");
-        userMessage.put("content", ctx.getEffectiveUserMessageContent());
+        userMessage.put("content", userContent);
         ctx.getMessages().add(userMessage);
 
         log.debug("[sessionId={}] 构建消息完成，共 {} 条消息，用户消息类型: {}",
@@ -1568,22 +1670,44 @@ public class AgentExecutionService {
 
         updateProgress(ctx, "信息搜索", "正在通过 OrioSearch 搜索相关信息...", 0.12, onResponse);
 
-        // 使用 OrioSearch 进行搜索
+        // 使用 OrioSearch 进行搜索（带超时控制）
         String searchContext = null;
         try {
-            searchContext = orioSearchService.getSearchContextForLLM(userMessage);
+            // 使用 CompletableFuture 实现超时控制
+            java.util.concurrent.CompletableFuture<String> searchFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                try {
+                    return orioSearchService.getSearchContextForLLM(userMessage);
+                } catch (Exception e) {
+                    log.warn("OrioSearch 搜索异常: {}", e.getMessage());
+                    return null;
+                }
+            });
+
+            searchContext = searchFuture.get(SEARCH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
 
             // 探索性查询进行扩展搜索
-            if (queryType == QueryType.EXPLORATORY) {
+            if (queryType == QueryType.EXPLORATORY && searchContext != null) {
                 String expandedQuery = expandQuery(userMessage);
                 if (!expandedQuery.equals(userMessage)) {
                     ctx.addThought("扩展搜索查询: " + expandedQuery);
-                    String expandedContext = orioSearchService.getSearchContextForLLM(expandedQuery);
+                    String finalSearchContext = searchContext;
+                    java.util.concurrent.CompletableFuture<String> expandedFuture = java.util.concurrent.CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return orioSearchService.getSearchContextForLLM(expandedQuery);
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    });
+                    String expandedContext = expandedFuture.get(SEARCH_TIMEOUT_MS / 2, TimeUnit.MILLISECONDS);
                     if (expandedContext != null && !expandedContext.isEmpty()) {
-                        searchContext = searchContext + "\n\n--- 扩展搜索 ---\n" + expandedContext;
+                        searchContext = finalSearchContext + "\n\n--- 扩展搜索 ---\n" + expandedContext;
                     }
                 }
             }
+        } catch (java.util.concurrent.TimeoutException e) {
+            log.warn("OrioSearch 搜索超时（{}ms），跳过预搜索", SEARCH_TIMEOUT_MS);
+            ctx.addReflection("搜索服务超时，将通过工具获取信息", 0.3);
+            return;
         } catch (Exception e) {
             log.warn("OrioSearch 搜索异常: {}", e.getMessage());
             ctx.addReflection("搜索服务异常: " + e.getMessage(), 0.3);
@@ -1971,8 +2095,8 @@ public class AgentExecutionService {
                     "只回复 YES 或 NO，不要有其他内容。");
             messages.add(sysMsg);
 
-            String truncatedResults = searchResults.length() > 3000 
-                    ? searchResults.substring(0, 3000) + "...[内容已截断]" 
+            String truncatedResults = searchResults.length() > 5000
+                    ? searchResults.substring(0, 5000) + "...[内容已截断]"
                     : searchResults;
 
             Map<String, Object> userMsg = new HashMap<>();
@@ -1986,6 +2110,8 @@ public class AgentExecutionService {
                     .stream(false)
                     .maxTokens(10)
                     .temperature(0.1)
+                    .sessionId(ctx.getSessionId())
+                    .userId(ctx.getUserId())
                     .build();
 
             LLMCompleteResponse response = llmClient.chatComplete(request);
@@ -2026,6 +2152,8 @@ public class AgentExecutionService {
                     .stream(true)
                     .maxTokens(2000)
                     .temperature(0.7)
+                    .sessionId(ctx.getSessionId())
+                    .userId(ctx.getUserId())
                     .build();
 
             StringBuilder answerBuilder = new StringBuilder();
@@ -2418,6 +2546,9 @@ public class AgentExecutionService {
                         } catch (Exception e) {
                             log.error("发送文件 SSE 失败: {}", e.getMessage());
                         }
+
+                        // 注册生成文件到会话索引，让后续对话可以引用
+                        registerGeneratedFile(ctx.getSessionId(), fileId, fileName, filePath, fileType, fileSize);
 
                         log.info("Skill {} generated file: {} ({} bytes, base64 length: {})",
                             skillName, filePath, fileSize, base64Content.length());
@@ -3067,9 +3198,6 @@ public class AgentExecutionService {
         ctx.setMaxIterations(config.getMaxIterations());
         ctx.setMaxConsecutiveErrors(config.getMaxConsecutiveErrors());
 
-        // 【改进】使用可配置的升级阈值
-        final int UPGRADE_TO_PLAN_EXECUTE_THRESHOLD = config.getUpgradeToPlanExecuteThreshold();
-
         // 执行元认知分析
         ExecutionContext.MetaCognition metaCognition = ctx.performMetaCognition();
         log.info("元认知评估: hasEnoughInfo={}, withinCapability={}, confidence={}",
@@ -3091,26 +3219,6 @@ public class AgentExecutionService {
         for (int iteration = 0; iteration < config.getMaxIterations(); iteration++) {
             ctx.setCurrentIteration(iteration);
             metricsService.recordIteration(ctx.getMetricsExecutionId());
-
-            // 【改进】ReAct → Plan-Execute 升级机制
-            // 条件：连续错误达到阈值 且 未强制使用 ReAct 且 未强制使用 Plan-Execute 且 未超过切换次数限制
-            if (ctx.getConsecutiveErrors() >= UPGRADE_TO_PLAN_EXECUTE_THRESHOLD
-                    && !config.isForceReactMode()
-                    && !config.isForcePlanExecuteMode()
-                    && ctx.getModeSwitchCount() < ExecutionContext.MAX_MODE_SWITCHES) {
-                log.info("[ReAct升级] 连续错误达到 {}，尝试升级到 Plan-Execute (切换次数: {}/{})",
-                    ctx.getConsecutiveErrors(), ctx.getModeSwitchCount() + 1, ExecutionContext.MAX_MODE_SWITCHES);
-                updateProgress(ctx, "策略升级", "ReAct 模式遇到困难，正在升级到 Plan-Execute 模式...", ctx.getProgress(), onResponse);
-
-                ctx.setModeSwitchCount(ctx.getModeSwitchCount() + 1);
-                resetContextForFallback(ctx);
-                if (executeWithTaskPlanner(ctx, config, onResponse)) {
-                    return;  // Plan-Execute 成功
-                }
-                // Plan-Execute 也失败了，继续 ReAct
-                log.warn("[ReAct升级] Plan-Execute 升级失败，继续 ReAct 模式");
-                ctx.setConsecutiveErrors(0);  // 重置错误计数
-            }
 
             if (ctx.getReasoningChain().shouldTerminateEarly()) {
                 String terminationReason = ctx.getReasoningChain().getTerminationMessage();
@@ -3302,7 +3410,35 @@ public class AgentExecutionService {
                 continue;
             }
 
+            // 【新增】处理 LLM 输出被截断的情况（finish_reason = "length"）
+            if (modelResponse.isTruncated()) {
+                log.warn("【ReAct循环】LLM 输出被截断 (finish_reason=length)，要求续写");
+                Map<String, Object> continueMsg = new HashMap<>();
+                continueMsg.put("role", "user");
+                continueMsg.put("content", "你的输出被截断了，请继续输出剩余内容。从你上次中断的地方继续，不要重复已输出的内容。");
+                ctx.getMessages().add(continueMsg);
+                continue;
+            }
+
             if (modelResponse.hasContent() || modelResponse.hasReasoningContent()) {
+                String responseContent = modelResponse.getContent() != null ? modelResponse.getContent() : "";
+
+                // 【增强】检查内容是否真正完成了任务
+                if (!isSubstantiveCompletion(ctx, responseContent)) {
+                    log.warn("【ReAct循环】模型返回内容但可能未真正完成任务，继续循环");
+
+                    // 添加提示让模型继续
+                    Map<String, Object> continueMsg = new HashMap<>();
+                    continueMsg.put("role", "user");
+                    continueMsg.put("content", "你的回答似乎不完整。请继续完成任务，确保给出实质性的结果。" +
+                        "如果需要调用工具，请调用工具；如果已完成，请给出详细、完整的回答。");
+                    ctx.getMessages().add(continueMsg);
+
+                    // 增加无进展计数
+                    ctx.setConsecutiveNoProgress(ctx.getConsecutiveNoProgress() + 1);
+                    continue;
+                }
+
                 log.info("【ReAct循环】模型返回内容，任务完成");
 
                 // Record final thought
@@ -3310,7 +3446,6 @@ public class AgentExecutionService {
 
                 // ReAct 循环结束时执行反思（如果启用且满足条件）
                 if (config.isEnableReflection() && shouldPerformDeepReflection(ctx)) {
-                    String responseContent = modelResponse.getContent() != null ? modelResponse.getContent() : "";
                     if (!responseContent.isEmpty()) {
                         updateProgress(ctx, "结果验证", "正在对结果进行反思验证...", 0.9, onResponse);
                         ReflectionResult reflection = performReflection(ctx, responseContent);
@@ -3320,17 +3455,34 @@ public class AgentExecutionService {
                         if (reflection.isNeedsCorrection()) {
                             log.info("反思检测到需要修正: {}", reflection.getCorrectionHint());
 
-                            AIChatResponse reflectionResp = new AIChatResponse();
-                            reflectionResp.setSessionId(ctx.getSessionId());
-                            reflectionResp.setModel(ctx.getActualModel());
-                            reflectionResp.setDone(false);
-                            reflectionResp.setType("reflection");
-                            Map<String, Object> reflectionData = new HashMap<>();
-                            reflectionData.put("needsCorrection", true);
-                            reflectionData.put("correctionHint", reflection.getCorrectionHint());
-                            reflectionData.put("confidenceScore", reflection.getConfidenceScore());
-                            reflectionResp.setToolCalls(reflectionData);
-                            onResponse.accept(reflectionResp);
+                            // 【增强】强制执行修正
+                            if (ctx.getConsecutiveCorrections() < 3) {
+                                ctx.setConsecutiveCorrections(ctx.getConsecutiveCorrections() + 1);
+
+                                AIChatResponse reflectionResp = new AIChatResponse();
+                                reflectionResp.setSessionId(ctx.getSessionId());
+                                reflectionResp.setModel(ctx.getActualModel());
+                                reflectionResp.setDone(false);
+                                reflectionResp.setType("reflection");
+                                Map<String, Object> reflectionData = new HashMap<>();
+                                reflectionData.put("needsCorrection", true);
+                                reflectionData.put("correctionHint", reflection.getCorrectionHint());
+                                reflectionData.put("confidenceScore", reflection.getConfidenceScore());
+                                reflectionResp.setToolCalls(reflectionData);
+                                onResponse.accept(reflectionResp);
+
+                                // 添加修正提示
+                                Map<String, Object> correctionMsg = new HashMap<>();
+                                correctionMsg.put("role", "user");
+                                correctionMsg.put("content", "你的回答存在问题：" + reflection.getCorrectionHint() +
+                                    "\n\n请重新回答用户的问题，确保完整准确地解决问题。");
+                                ctx.getMessages().add(correctionMsg);
+
+                                log.info("触发修正循环，修正次数: {}", ctx.getConsecutiveCorrections());
+                                continue;  // 继续循环，让模型重新回答
+                            } else {
+                                log.warn("修正次数已达上限 ({}次)，强制结束", ctx.getConsecutiveCorrections());
+                            }
                         }
                     }
                 }
@@ -3740,8 +3892,8 @@ public class AgentExecutionService {
                 
                 if (ctx.getTraceId() != null) {
                     String promptSummary = extractPromptSummary(ctx.getMessages());
-                    String responseSummary = response.getContent() != null 
-                            ? (response.getContent().length() > 500 ? response.getContent().substring(0, 500) + "..." : response.getContent())
+                    String responseSummary = response.getContent() != null
+                            ? (response.getContent().length() > 5000 ? response.getContent().substring(0, 5000) + "..." : response.getContent())
                             : "[工具调用模式]";
                     traceService.addLLMCallEvent(ctx.getTraceId(), promptSummary, responseSummary,
                             latencyMs, true, null);
@@ -4029,10 +4181,50 @@ public class AgentExecutionService {
         try {
             Map<String, Object> toolArgs = toolCall.getArguments() != null ? new HashMap<>(toolCall.getArguments()) : new HashMap<>();
 
+            // 【新增】为沙箱工具自动注入已有的 sessionId
+            injectSandboxSessionId(ctx, serverName, toolName, toolArgs);
+
+            // 【新增】沙箱命令验证和自动包装
+            if ("bash-sandbox".equals(serverName) && "execute".equals(toolName)) {
+                String command = toolArgs.containsKey("command") ? String.valueOf(toolArgs.get("command")) : null;
+                if (command != null) {
+                    // 验证命令安全性
+                    SandboxExecutionGuideService.ValidationResult validation =
+                        sandboxExecutionGuideService.validateCommand(command);
+                    if (!validation.isValid()) {
+                        log.warn("【沙箱安全】命令被阻止: {} - {}", command, validation.getReason());
+                        return new ToolExecutionResult(toolName, serverName, false, null,
+                            "命令被安全策略阻止: " + validation.getReason() + "\n建议: " + validation.getSuggestion(),
+                            System.currentTimeMillis() - startTime);
+                    }
+
+                    // 自动包装命令
+                    String wrappedCommand = sandboxExecutionGuideService.wrapCommand(command, null);
+                    if (!wrappedCommand.equals(command)) {
+                        log.info("【沙箱引导】命令已自动包装: {} -> {}", command, wrappedCommand);
+                        toolArgs.put("command", wrappedCommand);
+                    }
+
+                    // 如果有警告，记录日志
+                    if (!validation.getWarnings().isEmpty()) {
+                        log.info("【沙箱引导】命令建议: {}", String.join("; ", validation.getWarnings()));
+                    }
+                }
+            }
+
             // 为 run_skill_script 工具自动添加 session_id
             if ("run_skill_script".equals(toolName) && !toolArgs.containsKey("session_id")) {
                 toolArgs.put("session_id", ctx.getSessionId());
                 log.info("【工具执行】自动添加 session_id 到 run_skill_script 参数: {}", ctx.getSessionId());
+            }
+
+            // 为文件工具自动添加 session_id
+            if (("list_files".equals(toolName) || "read_file".equals(toolName) ||
+                 "search_file".equals(toolName) || "get_file_info".equals(toolName) ||
+                 "get_file_path".equals(toolName))
+                && !toolArgs.containsKey("session_id")) {
+                toolArgs.put("session_id", ctx.getSessionId());
+                log.info("【工具执行】自动添加 session_id 到 {} 参数: {}", toolName, ctx.getSessionId());
             }
 
             // URL缓存检查 - 如果该URL已被访问过，直接返回缓存结果
@@ -4154,6 +4346,11 @@ public class AgentExecutionService {
             if (toolResult.isSuccess()) {
                 fallbackStrategyService.recordSuccess(toolName, serverName);
 
+                // 【新增】自动提取和保存沙箱会话信息
+                if ("bash-sandbox".equals(serverName)) {
+                    extractAndSaveSandboxSession(ctx, toolResult, toolName);
+                }
+
                 // 检测文件导出操作并发送给前端
                 checkAndSendExportedFile(toolResult, toolName, serverName, ctx, onResponse);
             }
@@ -4216,6 +4413,74 @@ public class AgentExecutionService {
             
             return new ToolExecutionResult(toolName, serverName, false, null,
                     "工具调用异常: " + e.getMessage(), executionTime);
+        }
+    }
+
+    /**
+     * 【新增】从沙箱工具结果中提取并保存会话信息
+     */
+    private void extractAndSaveSandboxSession(ExecutionContext ctx, McpToolCallResponse toolResult, String toolName) {
+        try {
+            String resultText = extractResultText(toolResult);
+            if (resultText == null) {
+                return;
+            }
+
+            // 提取 sessionId
+            String sessionIdPattern = "sessionId: `([^`]+)`";
+            java.util.regex.Pattern sessionPattern = java.util.regex.Pattern.compile(sessionIdPattern);
+            java.util.regex.Matcher sessionMatcher = sessionPattern.matcher(resultText);
+            if (sessionMatcher.find()) {
+                String sandboxSessionId = sessionMatcher.group(1);
+                if (sandboxSessionId != null && !sandboxSessionId.isEmpty()) {
+                    ctx.setBashSandboxSessionId(sandboxSessionId);
+                    log.info("【沙箱会话】自动保存 sessionId: {}", sandboxSessionId);
+                }
+            }
+
+            // 提取 workingDirectory
+            String workingDirPattern = "workingDirectory: `([^`]+)`";
+            java.util.regex.Pattern dirPattern = java.util.regex.Pattern.compile(workingDirPattern);
+            java.util.regex.Matcher dirMatcher = dirPattern.matcher(resultText);
+            if (dirMatcher.find()) {
+                String workingDir = dirMatcher.group(1);
+                if (workingDir != null && !workingDir.isEmpty()) {
+                    ctx.setBashSandboxWorkingDir(workingDir);
+                    log.info("【沙箱会话】自动保存 workingDirectory: {}", workingDir);
+                }
+            }
+
+            // 如果是 execute 工具且没有 sessionId，尝试从参数中获取
+            if ("execute".equals(toolName) && ctx.getBashSandboxSessionId() == null) {
+                // 检查是否已有会话（从返回结果中判断）
+                if (resultText.contains("(后续命令可复用此会话)")) {
+                    log.info("【沙箱会话】检测到新创建的会话，已保存");
+                }
+            }
+
+        } catch (Exception e) {
+            log.warn("【沙箱会话】提取会话信息失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 【新增】为沙箱工具自动注入已有的 sessionId
+     */
+    private void injectSandboxSessionId(ExecutionContext ctx, String serverName, String toolName, Map<String, Object> toolArgs) {
+        if (!"bash-sandbox".equals(serverName)) {
+            return;
+        }
+
+        String existingSessionId = ctx.getBashSandboxSessionId();
+        if (existingSessionId != null && !existingSessionId.isEmpty()) {
+            // 对于需要 sessionId 的工具，自动注入
+            if ("execute".equals(toolName) || "export_file".equals(toolName) ||
+                "write_file".equals(toolName) || "read_file".equals(toolName)) {
+                if (!toolArgs.containsKey("sessionId")) {
+                    toolArgs.put("sessionId", existingSessionId);
+                    log.info("【沙箱会话】自动注入已有 sessionId: {}", existingSessionId);
+                }
+            }
         }
     }
 
@@ -4301,12 +4566,11 @@ public class AgentExecutionService {
             if (sig.equals(callSignature)) repeatCount++;
         }
 
-        if (repeatCount >= config.getRepeatCallThreshold()) {
-            log.warn("检测到重复工具调用 {} ({}次)", callSignature, repeatCount);
-            Map<String, Object> warnMsg = new HashMap<>();
-            warnMsg.put("role", "user");
-            warnMsg.put("content", "你已经连续 " + repeatCount + " 次调用相同的工具。请停止重复调用，直接给出答案。");
-            ctx.getMessages().add(warnMsg);
+        // 简化逻辑：只在重复调用次数非常高时（10次以上）才给出警告
+        // 不再强制中断，让模型自己决定下一步
+        // maxIterations 和 maxConsecutiveErrors 已经足够防止无限循环
+        if (repeatCount >= 10) {
+            log.warn("检测到大量重复工具调用 {} ({}次)，但不强制中断", callSignature, repeatCount);
         }
 
         // 跨工具URL重复检测
@@ -4432,6 +4696,96 @@ public class AgentExecutionService {
         }
 
         return Math.min(score, 1.0);
+    }
+
+    /**
+     * 检查内容是否是实质性的任务完成
+     * 【新增】防止模型敷衍回答
+     *
+     * @param ctx 执行上下文
+     * @param content 模型返回的内容
+     * @return 是否是实质性的完成
+     */
+    private boolean isSubstantiveCompletion(ExecutionContext ctx, String content) {
+        if (content == null || content.trim().isEmpty()) {
+            log.debug("实质性检查: 内容为空");
+            return false;
+        }
+
+        String trimmed = content.trim();
+
+        // 1. 检查内容长度（太短可能是敷衍）
+        if (trimmed.length() < 30) {
+            log.debug("实质性检查: 内容过短 ({} 字符)", trimmed.length());
+            return false;
+        }
+
+        // 2. 检查是否包含敷衍回答模式
+        String[] perfunctoryPatterns = {
+            "好的，我来帮你", "好的，让我", "我来帮你", "让我来帮你",
+            "我将", "我会帮你", "首先，我", "好的，我"
+        };
+
+        for (String pattern : perfunctoryPatterns) {
+            if (trimmed.startsWith(pattern) && trimmed.length() < 150) {
+                log.debug("实质性检查: 检测到敷衍回答模式 '{}'", pattern);
+                return false;
+            }
+        }
+
+        // 3. 检查是否有工具调用历史但没有实际结果
+        int toolCallCount = ctx.getToolResults().size();
+        if (toolCallCount == 0) {
+            // 没有工具调用，检查内容是否足够详细
+            if (trimmed.length() < 100) {
+                log.debug("实质性检查: 无工具调用但内容较短 ({} 字符)", trimmed.length());
+                // 不直接返回 false，因为有些简单问题不需要工具
+            }
+        } else {
+            // 有工具调用，检查是否引用了工具结果
+            boolean referencesToolResults = false;
+            String lowerContent = trimmed.toLowerCase();
+
+            // 检查是否引用了工具返回的数据
+            String[] dataKeywords = {"结果", "数据", "信息", "找到", "发现", "获取", "显示", "表明",
+                "result", "data", "found", "shows", "indicates"};
+            for (String keyword : dataKeywords) {
+                if (lowerContent.contains(keyword)) {
+                    referencesToolResults = true;
+                    break;
+                }
+            }
+
+            if (!referencesToolResults && trimmed.length() < 200) {
+                log.debug("实质性检查: 有工具调用但未引用结果且内容较短");
+                return false;
+            }
+        }
+
+        // 4. 检查是否以不完整的句子结尾
+        if (trimmed.endsWith("，") || trimmed.endsWith(",") ||
+            trimmed.endsWith("、") || trimmed.endsWith(":") || trimmed.endsWith("：")) {
+            log.debug("实质性检查: 内容以不完整的句子结尾");
+            return false;
+        }
+
+        // 5. 检查是否有"待续"、"未完"等标记
+        if (trimmed.contains("待续") || trimmed.contains("未完") ||
+            trimmed.contains("to be continued")) {
+            log.debug("实质性检查: 内容包含未完成标记");
+            return false;
+        }
+
+        // 6. 检查证据存储是否有足够的内容
+        int evidenceSize = ctx.getEvidenceStore().size();
+        if (toolCallCount > 2 && evidenceSize == 0) {
+            log.debug("实质性检查: 有工具调用但无证据存储");
+            // 这可能表示工具调用没有产生有效结果
+        }
+
+        log.debug("实质性检查: 通过 (长度: {}, 工具调用: {}, 证据: {})",
+            trimmed.length(), toolCallCount, evidenceSize);
+        return true;
     }
 
     /**
@@ -4650,6 +5004,47 @@ public class AgentExecutionService {
         sendDoneResponse(ctx, onResponse);
     }
 
+    /**
+     * 注册生成的文件到会话索引，让后续对话可以引用
+     */
+    private void registerGeneratedFile(String sessionId, String fileId, String fileName,
+                                        String filePath, String fileType, long fileSize) {
+        try {
+            if (sessionId == null || filePath == null) {
+                log.debug("跳过注册生成文件: sessionId={}, filePath={}", sessionId, filePath);
+                return;
+            }
+            // 推断 MIME 类型
+            String mimeType = inferMimeType(fileName, fileType);
+            sessionFileIndexService.registerFile(
+                sessionId,
+                fileId != null ? fileId : "gen_" + System.currentTimeMillis(),
+                fileName,
+                mimeType,
+                fileSize,
+                filePath
+            );
+            log.info("注册生成文件到会话索引: sessionId={}, fileName={}, filePath={}", sessionId, fileName, filePath);
+        } catch (Exception e) {
+            log.warn("注册生成文件失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 根据文件名和类型推断 MIME 类型
+     */
+    private String inferMimeType(String fileName, String fileType) {
+        if (fileName == null) return "application/octet-stream";
+        String lower = fileName.toLowerCase();
+        if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.endsWith(".md")) return "text/markdown";
+        if (lower.endsWith(".txt")) return "text/plain";
+        return "application/octet-stream";
+    }
+
     private void sendErrorResponse(ExecutionContext ctx, String error, Consumer<AIChatResponse> onResponse) {
         // 记录错误到 ReasoningChain
         ctx.addThought("执行失败: " + error);
@@ -4730,15 +5125,10 @@ public class AgentExecutionService {
     }
 
     /**
-     * 清理 bash-sandbox 会话目录，避免临时文件堆积
+     * 清理 bash-sandbox 会话：关闭进程但保留文件，延迟后再删除文件
      */
     private void cleanupBashSandboxSessions(ExecutionContext ctx) {
         try {
-            // 获取当前会话中使用的 bash-sandbox 会话 ID
-            // 会话 ID 格式通常是 "sess_<timestamp>_<random>"
-            // 我们需要清理与当前 session 相关的所有 bash-sandbox 会话
-
-            // 调用 bash-sandbox 的 list_sessions 获取所有会话
             McpToolCallResponse listResult = mcpHostService.callTool("bash-sandbox", "list_sessions", new HashMap<>());
             if (listResult.isSuccess() && listResult.getContent() != null) {
                 String content = listResult.getContent().stream()
@@ -4747,34 +5137,35 @@ public class AgentExecutionService {
                     .findFirst()
                     .orElse("");
 
-                // 解析会话列表
                 if (content.contains("sessions") || content.contains("[")) {
-                    // 提取会话 ID 并关闭它们
                     java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("\"sessionId\"\\s*:\\s*\"(sess_[^\"]+)\"");
                     java.util.regex.Matcher matcher = pattern.matcher(content);
 
-                    List<String> sessionsToClean = new ArrayList<>();
+                    List<String> sessionsToSchedule = new ArrayList<>();
                     while (matcher.find()) {
                         String sandboxSessionId = matcher.group(1);
-                        sessionsToClean.add(sandboxSessionId);
+                        sessionsToSchedule.add(sandboxSessionId);
                     }
 
-                    // 关闭每个会话（带清理）
-                    for (String sandboxSessionId : sessionsToClean) {
+                    for (String sandboxSessionId : sessionsToSchedule) {
                         try {
+                            // 关闭会话进程（释放资源），但保留文件目录（cleanup=false）
                             Map<String, Object> closeParams = new HashMap<>();
                             closeParams.put("sessionId", sandboxSessionId);
-                            closeParams.put("cleanup", true);
+                            closeParams.put("cleanup", false);
 
                             mcpHostService.callTool("bash-sandbox", "close_session", closeParams);
-                            log.debug("已清理 bash-sandbox 会话: {}", sandboxSessionId);
+                            log.debug("已关闭 bash-sandbox 会话进程（保留文件）: {}", sandboxSessionId);
+
+                            // 将会话加入延迟清理列表，30 分钟后再清理文件
+                            bashSandboxService.scheduleSessionCleanup(sandboxSessionId);
                         } catch (Exception e) {
-                            log.warn("清理 bash-sandbox 会话失败: {} - {}", sandboxSessionId, e.getMessage());
+                            log.warn("关闭 bash-sandbox 会话失败: {} - {}", sandboxSessionId, e.getMessage());
                         }
                     }
 
-                    if (!sessionsToClean.isEmpty()) {
-                        log.info("已清理 {} 个 bash-sandbox 会话目录", sessionsToClean.size());
+                    if (!sessionsToSchedule.isEmpty()) {
+                        log.info("已关闭 {} 个 bash-sandbox 会话进程并加入延迟清理列表", sessionsToSchedule.size());
                     }
                 }
             }
@@ -4791,21 +5182,32 @@ public class AgentExecutionService {
         try {
             // 只有用户开启知识提取时才执行
             if (ctx.isEnableKnowledgeExtraction()) {
-                List<Map<String, Object>> nonSystemMessages = new ArrayList<>();
-                for (Map<String, Object> msg : ctx.getMessages()) {
+                // 获取最后一轮对话
+                String lastUserMsg = null;
+                String lastAssistantMsg = null;
+
+                for (int i = ctx.getMessages().size() - 1; i >= 0; i--) {
+                    Map<String, Object> msg = ctx.getMessages().get(i);
                     String role = (String) msg.get("role");
-                    if (!"system".equals(role)) {
-                        nonSystemMessages.add(msg);
+
+                    if ("user".equals(role) && lastUserMsg == null) {
+                        lastUserMsg = (String) msg.get("content");
+                    } else if ("assistant".equals(role) && lastAssistantMsg == null) {
+                        lastAssistantMsg = (String) msg.get("content");
                     }
+
+                    if (lastUserMsg != null && lastAssistantMsg != null) break;
                 }
 
-                // 异步提取知识图谱（合并了长期记忆功能）
-                knowledgeExtractorService.extractAsync(
-                        ctx.getUserId(), ctx.getSessionId(), nonSystemMessages, ctx.getModel());
+                // 使用记忆宫殿系统异步提取记忆
+                if (lastUserMsg != null) {
+                    memoryPalaceService.createFromConversationAsync(
+                            ctx.getUserId(), ctx.getSessionId(), lastUserMsg, lastAssistantMsg);
+                }
             }
 
         } catch (Exception e) {
-            log.warn("自动提取知识失败：{}", e.getMessage());
+            log.warn("自动提取记忆失败：{}", e.getMessage());
         }
 
         try {
@@ -4841,7 +5243,7 @@ public class AgentExecutionService {
             Thread.currentThread().interrupt();
         }
     }
-    
+
     private String sanitizeApiUrl(String apiUrl) {
         if (apiUrl == null || apiUrl.isEmpty()) {
             return "";

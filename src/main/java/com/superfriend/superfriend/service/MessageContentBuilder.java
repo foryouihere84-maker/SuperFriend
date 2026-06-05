@@ -22,7 +22,7 @@ public class MessageContentBuilder {
 
     /**
      * 从请求构建用户消息内容
-     * 优先级：content > (message + images) > message
+     * 优先级：content > (message + images + documents + audios + videos) > message
      *
      * @param request AI 对话请求
      * @return 消息内容，可能是 String 或 List<Map<String, Object>>
@@ -34,10 +34,25 @@ public class MessageContentBuilder {
             return convertContentToMaps(request.getContent());
         }
 
-        // 2. 文本 + 图片便捷方式
-        if (request.getImages() != null && !request.getImages().isEmpty()) {
-            log.debug("构建多模态消息：文本 + {} 张图片", request.getImages().size());
-            return buildMultimodalContent(request.getMessage(), request.getImages());
+        // 2. 检查是否有任何便捷方式的文件附件
+        boolean hasImages = request.getImages() != null && !request.getImages().isEmpty();
+        boolean hasDocuments = request.getDocuments() != null && !request.getDocuments().isEmpty();
+        boolean hasAudios = request.getAudios() != null && !request.getAudios().isEmpty();
+        boolean hasVideos = request.getVideos() != null && !request.getVideos().isEmpty();
+
+        if (hasImages || hasDocuments || hasAudios || hasVideos) {
+            log.debug("构建多模态消息：文本 + {} 图片 + {} 文档 + {} 音频 + {} 视频",
+                hasImages ? request.getImages().size() : 0,
+                hasDocuments ? request.getDocuments().size() : 0,
+                hasAudios ? request.getAudios().size() : 0,
+                hasVideos ? request.getVideos().size() : 0);
+            return buildMultimodalContentWithFiles(
+                request.getMessage(),
+                request.getImages(),
+                request.getDocuments(),
+                request.getAudios(),
+                request.getVideos()
+            );
         }
 
         // 3. 纯文本（向后兼容）
@@ -141,6 +156,22 @@ public class MessageContentBuilder {
      * @return 多模态内容列表
      */
     private List<Map<String, Object>> buildMultimodalContent(String text, List<String> imageUrls) {
+        return buildMultimodalContentWithFiles(text, imageUrls, null, null, null);
+    }
+
+    /**
+     * 构建多模态内容（文本 + 图片 + 文档 + 音频 + 视频）
+     *
+     * @param text       文本内容（可为 null）
+     * @param imageUrls  图片 URL 列表
+     * @param documents  文档 URL 列表
+     * @param audios     音频 URL 列表
+     * @param videos     视频 URL 列表
+     * @return 多模态内容列表
+     */
+    private List<Map<String, Object>> buildMultimodalContentWithFiles(
+            String text, List<String> imageUrls,
+            List<String> documents, List<String> audios, List<String> videos) {
         List<Map<String, Object>> contents = new ArrayList<>();
 
         // 添加文本
@@ -166,7 +197,114 @@ public class MessageContentBuilder {
             }
         }
 
+        // 添加文档（使用 file_url 类型）
+        if (documents != null) {
+            for (String docUrl : documents) {
+                if (docUrl != null && !docUrl.isEmpty()) {
+                    Map<String, Object> docPart = new HashMap<>();
+                    docPart.put("type", "file_url");
+
+                    Map<String, Object> urlWrapper = new HashMap<>();
+                    urlWrapper.put("url", docUrl);
+                    // 尝试从 URL 推断 MIME 类型
+                    String mimeType = inferMimeType(docUrl);
+                    if (mimeType != null) {
+                        urlWrapper.put("mime_type", mimeType);
+                    }
+                    docPart.put("file_url", urlWrapper);
+                    contents.add(docPart);
+                }
+            }
+        }
+
+        // 添加音频
+        if (audios != null) {
+            for (String audioUrl : audios) {
+                if (audioUrl != null && !audioUrl.isEmpty()) {
+                    Map<String, Object> audioPart = new HashMap<>();
+                    audioPart.put("type", "audio_url");
+
+                    Map<String, Object> urlWrapper = new HashMap<>();
+                    urlWrapper.put("url", audioUrl);
+                    String mimeType = inferAudioMimeType(audioUrl);
+                    if (mimeType != null) {
+                        urlWrapper.put("mime_type", mimeType);
+                    }
+                    audioPart.put("audio_url", urlWrapper);
+                    contents.add(audioPart);
+                }
+            }
+        }
+
+        // 添加视频
+        if (videos != null) {
+            for (String videoUrl : videos) {
+                if (videoUrl != null && !videoUrl.isEmpty()) {
+                    Map<String, Object> videoPart = new HashMap<>();
+                    videoPart.put("type", "video_url");
+
+                    Map<String, Object> urlWrapper = new HashMap<>();
+                    urlWrapper.put("url", videoUrl);
+                    String mimeType = inferVideoMimeType(videoUrl);
+                    if (mimeType != null) {
+                        urlWrapper.put("mime_type", mimeType);
+                    }
+                    videoPart.put("video_url", urlWrapper);
+                    contents.add(videoPart);
+                }
+            }
+        }
+
         return contents;
+    }
+
+    /**
+     * 从 URL 推断文档 MIME 类型
+     */
+    private String inferMimeType(String url) {
+        if (url == null) return null;
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".pdf")) return "application/pdf";
+        if (lower.endsWith(".docx")) return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        if (lower.endsWith(".doc")) return "application/msword";
+        if (lower.endsWith(".xlsx")) return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        if (lower.endsWith(".xls")) return "application/vnd.ms-excel";
+        if (lower.endsWith(".pptx")) return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+        if (lower.endsWith(".ppt")) return "application/vnd.ms-powerpoint";
+        if (lower.endsWith(".txt")) return "text/plain";
+        if (lower.endsWith(".md")) return "text/markdown";
+        if (lower.endsWith(".json")) return "application/json";
+        if (lower.endsWith(".xml")) return "application/xml";
+        return "application/octet-stream";
+    }
+
+    /**
+     * 从 URL 推断音频 MIME 类型
+     */
+    private String inferAudioMimeType(String url) {
+        if (url == null) return null;
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".mp3")) return "audio/mpeg";
+        if (lower.endsWith(".wav")) return "audio/wav";
+        if (lower.endsWith(".m4a")) return "audio/mp4";
+        if (lower.endsWith(".flac")) return "audio/flac";
+        if (lower.endsWith(".ogg")) return "audio/ogg";
+        if (lower.endsWith(".aac")) return "audio/aac";
+        return "audio/mpeg";
+    }
+
+    /**
+     * 从 URL 推断视频 MIME 类型
+     */
+    private String inferVideoMimeType(String url) {
+        if (url == null) return null;
+        String lower = url.toLowerCase();
+        if (lower.endsWith(".mp4")) return "video/mp4";
+        if (lower.endsWith(".avi")) return "video/x-msvideo";
+        if (lower.endsWith(".mov")) return "video/quicktime";
+        if (lower.endsWith(".mkv")) return "video/x-matroska";
+        if (lower.endsWith(".webm")) return "video/webm";
+        return "video/mp4";
     }
 
     /**

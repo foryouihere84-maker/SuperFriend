@@ -9,14 +9,18 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -39,6 +43,13 @@ public class BashSandboxService {
     private Timer executionTimer;
     private Counter sessionCreatedCounter;
     private Counter sessionClosedCounter;
+
+    // 待延迟清理的会话：Key=sessionId, Value=加入时间戳
+    private final ConcurrentHashMap<String, Long> pendingCleanupSessions = new ConcurrentHashMap<>();
+
+    // 延迟清理时间（毫秒），默认 30 分钟
+    @Value("${bash-sandbox.session-cleanup-delay-ms:1800000}")
+    private long sessionCleanupDelayMs;
 
     @Autowired
     public BashSandboxService(McpHostService mcpHostService,
@@ -317,6 +328,93 @@ public class BashSandboxService {
             return false;
         }
         return config.isEnabled();
+    }
+
+    // ==================== 延迟清理 ====================
+
+    /**
+     * 将会话加入延迟清理列表
+     * 对话结束后调用：关闭会话进程但保留文件目录，延迟一段时间后再清理文件
+     *
+     * @param sessionId bash-sandbox 会话 ID
+     */
+    public void scheduleSessionCleanup(String sessionId) {
+        pendingCleanupSessions.put(sessionId, System.currentTimeMillis());
+        log.info("会话已加入延迟清理列表: sessionId={}, 延迟{}ms后清理", sessionId, sessionCleanupDelayMs);
+    }
+
+    /**
+     * 定时检查并清理超时的待清理会话
+     * 每 5 分钟执行一次
+     */
+    @Scheduled(fixedRate = 5 * 60 * 1000)
+    public void cleanupPendingSessions() {
+        if (pendingCleanupSessions.isEmpty()) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        int cleaned = 0;
+
+        for (Map.Entry<String, Long> entry : pendingCleanupSessions.entrySet()) {
+            String sessionId = entry.getKey();
+            long scheduledTime = entry.getValue();
+
+            if (now - scheduledTime >= sessionCleanupDelayMs) {
+                pendingCleanupSessions.remove(sessionId);
+                try {
+                    // 关闭会话并清理文件目录
+                    Map<String, Object> closeParams = new HashMap<>();
+                    closeParams.put("sessionId", sessionId);
+                    closeParams.put("cleanup", true);
+
+                    mcpHostService.callTool(config.getMcpServerName(), "close_session", closeParams);
+                    cleaned++;
+                    log.info("延迟清理 bash-sandbox 会话: sessionId={}, 存活时间={}ms",
+                            sessionId, now - scheduledTime);
+                } catch (Exception e) {
+                    log.warn("延迟清理 bash-sandbox 会话失败: sessionId={}, error={}", sessionId, e.getMessage());
+                }
+            }
+        }
+
+        if (cleaned > 0) {
+            log.info("本次延迟清理完成，清理了 {} 个会话，剩余待清理: {}", cleaned, pendingCleanupSessions.size());
+        }
+    }
+
+    /**
+     * 获取待清理会话数量
+     */
+    public int getPendingCleanupCount() {
+        return pendingCleanupSessions.size();
+    }
+
+    /**
+     * 应用关闭时清理所有待清理会话
+     */
+    @PreDestroy
+    public void onShutdown() {
+        if (pendingCleanupSessions.isEmpty()) {
+            return;
+        }
+
+        log.info("应用关闭，清理 {} 个待清理的 bash-sandbox 会话...", pendingCleanupSessions.size());
+        for (Map.Entry<String, Long> entry : pendingCleanupSessions.entrySet()) {
+            String sessionId = entry.getKey();
+            try {
+                Map<String, Object> closeParams = new HashMap<>();
+                closeParams.put("sessionId", sessionId);
+                closeParams.put("cleanup", true);
+
+                mcpHostService.callTool(config.getMcpServerName(), "close_session", closeParams);
+                log.debug("应用关闭时清理 bash-sandbox 会话: {}", sessionId);
+            } catch (Exception e) {
+                log.warn("应用关闭时清理 bash-sandbox 会话失败: sessionId={}, error={}", sessionId, e.getMessage());
+            }
+        }
+        pendingCleanupSessions.clear();
+        log.info("待清理 bash-sandbox 会话清理完成");
     }
 
     // ==================== Phase 4: 高级功能 ====================
@@ -729,22 +827,29 @@ public class BashSandboxService {
         try {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
-                    : "{}";
-            JsonNode data = objectMapper.readTree(content);
+                    : "";
 
-            return ExecuteResult.builder()
-                    .success(data.path("success").asBoolean())
-                    .stdout(data.path("stdout").asText())
-                    .stderr(data.path("stderr").asText())
-                    .exitCode(data.path("exitCode").asInt())
-                    .executionTimeMs(data.path("executionTimeMs").asLong())
-                    .sessionId(data.path("sessionId").asText())
-                    .workingDirectory(data.path("workingDirectory").asText())
-                    .blocked(data.path("blocked").asBoolean())
-                    .blockedReason(data.path("blockedReason").asText(null))
-                    .error(data.path("error").asText(null))
-                    .timedOut(data.path("timedOut").asBoolean(false))
-                    .build();
+            // bash-sandbox 返回格式化的 markdown 文本，尝试从中提取结构化数据
+            // 先尝试直接解析 JSON
+            try {
+                JsonNode data = objectMapper.readTree(content);
+                return ExecuteResult.builder()
+                        .success(data.path("success").asBoolean())
+                        .stdout(data.path("stdout").asText())
+                        .stderr(data.path("stderr").asText())
+                        .exitCode(data.path("exitCode").asInt())
+                        .executionTimeMs(data.path("executionTimeMs").asLong())
+                        .sessionId(data.path("sessionId").asText())
+                        .workingDirectory(data.path("workingDirectory").asText())
+                        .blocked(data.path("blocked").asBoolean())
+                        .blockedReason(data.path("blockedReason").asText(null))
+                        .error(data.path("error").asText(null))
+                        .timedOut(data.path("timedOut").asBoolean(false))
+                        .build();
+            } catch (Exception jsonEx) {
+                // 不是 JSON，从 markdown 文本中提取信息
+                return parseMarkdownExecuteResult(content);
+            }
         } catch (Exception e) {
             log.error("解析执行结果失败: {}", e.getMessage());
             return ExecuteResult.builder()
@@ -754,35 +859,159 @@ public class BashSandboxService {
         }
     }
 
+    /**
+     * 从 bash-sandbox 返回的 markdown 格式文本中提取执行结果
+     * bash-sandbox execute 工具返回格式化的 markdown，包含：
+     * - sessionId
+     * - workingDirectory
+     * - executionTime
+     * - stdout (在 **输出** 代码块中)
+     * - stderr (在 **错误输出** 代码块中)
+     */
+    private ExecuteResult parseMarkdownExecuteResult(String content) {
+        String sessionId = extractValue(content, "sessionId: `", "`");
+        String workingDirectory = extractValue(content, "workingDirectory: `", "`");
+        String executionTimeStr = extractValue(content, "执行时间: ", "ms");
+        long executionTimeMs = 0;
+        if (executionTimeStr != null) {
+            try {
+                executionTimeMs = Long.parseLong(executionTimeStr.trim());
+            } catch (NumberFormatException ignored) {}
+        }
+
+        // 提取 stdout：在 **输出** 后的代码块中
+        String stdout = extractCodeBlock(content, "**输出**");
+        // 提取 stderr：在 **错误输出** 后的代码块中
+        String stderr = extractCodeBlock(content, "**错误输出**");
+
+        // 判断成功：如果有 stdout 且不包含错误信息
+        boolean success = stdout != null && !stdout.isEmpty();
+        int exitCode = success ? 0 : -1;
+
+        // 检查是否被阻止
+        boolean blocked = content.contains("命令被阻止") || content.contains("blocked");
+        String blockedReason = null;
+        if (blocked) {
+            blockedReason = extractValue(content, "原因: ", "\n");
+        }
+
+        return ExecuteResult.builder()
+                .success(success && !blocked)
+                .stdout(stdout != null ? stdout : "")
+                .stderr(stderr != null ? stderr : "")
+                .exitCode(exitCode)
+                .executionTimeMs(executionTimeMs)
+                .sessionId(sessionId != null ? sessionId : "")
+                .workingDirectory(workingDirectory != null ? workingDirectory : "")
+                .blocked(blocked)
+                .blockedReason(blockedReason)
+                .timedOut(false)
+                .build();
+    }
+
+    private String extractValue(String text, String prefix, String suffix) {
+        int start = text.indexOf(prefix);
+        if (start < 0) return null;
+        start += prefix.length();
+        int end = text.indexOf(suffix, start);
+        if (end < 0) return null;
+        return text.substring(start, end);
+    }
+
+    private String extractCodeBlock(String text, String label) {
+        int labelIdx = text.indexOf(label);
+        if (labelIdx < 0) return null;
+        // 找到标签后的第一个 ``` 代码块
+        int codeStart = text.indexOf("```\n", labelIdx);
+        if (codeStart < 0) return null;
+        codeStart += 4; // skip ```\n
+        int codeEnd = text.indexOf("\n```", codeStart);
+        if (codeEnd < 0) return null;
+        return text.substring(codeStart, codeEnd);
+    }
+
     private SessionInfo parseSessionInfo(McpToolCallResponse response) {
         try {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
                     : "{}";
-            JsonNode data = objectMapper.readTree(content);
 
-            if (data.has("session")) {
-                JsonNode session = data.path("session");
+            // 先尝试 JSON 解析
+            try {
+                JsonNode data = objectMapper.readTree(content);
+
+                if (data.has("session")) {
+                    JsonNode session = data.path("session");
+                    return SessionInfo.builder()
+                            .sessionId(session.path("sessionId").asText())
+                            .workingDirectory(session.path("workingDirectory").asText())
+                            .createdAt(session.path("createdAt").asText())
+                            .lastActivityAt(session.path("lastActivityAt").asText())
+                            .name(session.path("name").asText(null))
+                            .commandCount(session.path("commandCount").asInt(0))
+                            .totalExecutionTimeMs(session.path("totalExecutionTimeMs").asLong(0))
+                            .build();
+                }
+
                 return SessionInfo.builder()
-                        .sessionId(session.path("sessionId").asText())
-                        .workingDirectory(session.path("workingDirectory").asText())
-                        .createdAt(session.path("createdAt").asText())
-                        .lastActivityAt(session.path("lastActivityAt").asText())
-                        .name(session.path("name").asText(null))
-                        .commandCount(session.path("commandCount").asInt(0))
-                        .totalExecutionTimeMs(session.path("totalExecutionTimeMs").asLong(0))
+                        .sessionId(data.path("sessionId").asText())
+                        .workingDirectory(data.path("workingDirectory").asText())
+                        .createdAt(data.path("createdAt").asText())
                         .build();
-            }
+            } catch (Exception jsonEx) {
+                // JSON 解析失败，尝试从 Markdown 文本中提取 sessionId 和 workingDirectory
+                log.debug("JSON解析失败，尝试从文本中提取会话信息: {}", jsonEx.getMessage());
+                String sessionId = extractValueFromText(content, "sessionId");
+                String workingDirectory = extractValueFromText(content, "workingDirectory");
 
-            return SessionInfo.builder()
-                    .sessionId(data.path("sessionId").asText())
-                    .workingDirectory(data.path("workingDirectory").asText())
-                    .createdAt(data.path("createdAt").asText())
-                    .build();
+                if (sessionId != null && !sessionId.isEmpty()) {
+                    log.info("从Markdown文本中提取会话信息: sessionId={}, workingDirectory={}", sessionId, workingDirectory);
+                    return SessionInfo.builder()
+                            .sessionId(sessionId)
+                            .workingDirectory(workingDirectory != null ? workingDirectory : "")
+                            .createdAt("")
+                            .build();
+                }
+
+                log.error("无法从文本中提取会话信息: {}", content.substring(0, Math.min(content.length(), 200)));
+                return null;
+            }
         } catch (Exception e) {
             log.error("解析会话信息失败: {}", e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * 从 Markdown 格式文本中提取键值
+     * 支持格式: - key: `value` 或 key: "value" 或 key: value
+     */
+    private String extractValueFromText(String text, String key) {
+        // 匹配: - key: `value`
+        java.util.regex.Pattern pattern1 = java.util.regex.Pattern.compile(
+            "-\\s*" + key + "\\s*:\\s*`([^`]+)`", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher1 = pattern1.matcher(text);
+        if (matcher1.find()) {
+            return matcher1.group(1).trim();
+        }
+
+        // 匹配: key: "value" 或 key: 'value'
+        java.util.regex.Pattern pattern2 = java.util.regex.Pattern.compile(
+            key + "\\s*:\\s*[\"']([^\"']+)[\"']", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher2 = pattern2.matcher(text);
+        if (matcher2.find()) {
+            return matcher2.group(1).trim();
+        }
+
+        // 匹配: key: value (行内简单格式)
+        java.util.regex.Pattern pattern3 = java.util.regex.Pattern.compile(
+            key + "\\s*:\\s*(\\S+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher3 = pattern3.matcher(text);
+        if (matcher3.find()) {
+            return matcher3.group(1).trim();
+        }
+
+        return null;
     }
 
     private List<SessionInfo> parseSessionList(McpToolCallResponse response) {
@@ -817,8 +1046,18 @@ public class BashSandboxService {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
                     : "{}";
-            JsonNode data = objectMapper.readTree(content);
-            return data.path("success").asBoolean();
+            try {
+                JsonNode data = objectMapper.readTree(content);
+                return data.path("success").asBoolean();
+            } catch (Exception jsonEx) {
+                // JSON 解析失败，检查文本中是否包含成功标识
+                log.debug("parseBooleanResult JSON解析失败，尝试从文本判断: {}", jsonEx.getMessage());
+                if (content.contains("✅") || content.contains("成功") ||
+                    content.toLowerCase().contains("success")) {
+                    return true;
+                }
+                return false;
+            }
         } catch (Exception e) {
             return false;
         }

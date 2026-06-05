@@ -1,6 +1,7 @@
 package com.superfriend.superfriend.service;
 
 import com.superfriend.superfriend.dto.AIChatRequest;
+import com.superfriend.superfriend.dto.ChatMessage;
 import com.superfriend.superfriend.dto.ChatMessageContent;
 import com.superfriend.superfriend.dto.UserIntent;
 import lombok.extern.slf4j.Slf4j;
@@ -11,7 +12,9 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户意图识别服务
@@ -31,6 +34,10 @@ public class UserIntentService {
     @Autowired
     @Lazy
     private LLMIntentClassifier llmIntentClassifier;
+
+    @Autowired
+    @Lazy
+    private SessionFileIndexService sessionFileIndexService;
 
     @Value("${intent.classifier.enabled:true}")
     private boolean llmClassifierEnabled;
@@ -103,6 +110,7 @@ public class UserIntentService {
         List<String> audios = request.getAudios();
         List<String> videos = request.getVideos();
         Long userId = request.getUserId();
+        String sessionId = request.getSessionId();
 
         log.info("开始分析用户意图，文本: {}, 图片: {}, 文档: {}, 音频: {}, 视频: {}",
                 text != null ? (text.length() > 50 ? text.substring(0, 50) + "..." : text) : "null",
@@ -113,11 +121,34 @@ public class UserIntentService {
 
         // 收集附件类型
         List<String> attachmentTypes = collectAttachmentTypes(content, images, documents, audios, videos);
+        boolean hasAttachments = !attachmentTypes.isEmpty();
+
+        // 提取对话历史（用于上下文感知的意图分类）
+        List<Map<String, String>> historyMessages = extractHistoryForIntentClassification(request);
+
+        // 检查会话是否已有文件（用于上下文感知）
+        boolean sessionHasFiles = sessionId != null && sessionFileIndexService.hasRegisteredFiles(sessionId);
+
+        // 构建上下文信息（包含会话状态）
+        IntentContext context = new IntentContext(
+                sessionId,
+                hasAttachments,
+                sessionHasFiles,
+                historyMessages
+        );
 
         // 优先使用 LLM 意图分类
         if (llmClassifierEnabled) {
-            UserIntent llmIntent = llmIntentClassifier.classifyIntent(text, attachmentTypes, userId);
+            UserIntent llmIntent = llmIntentClassifier.classifyIntent(text, attachmentTypes, context, userId);
             if (llmIntent != null && llmIntent.getConfidence() >= 0.7) {
+                // ========== 关键修正：无附件时，PARSE_* 意图不合理 ==========
+                if (!hasAttachments && isParseIntent(llmIntent.getType())) {
+                    log.info("LLM 返回解析意图但无附件，修正为 CHAT: originalIntent={}", llmIntent.getType());
+                    UserIntent correctedIntent = UserIntent.chat();
+                    correctedIntent.setUserText(text);
+                    return correctedIntent;
+                }
+
                 log.info("LLM 意图分类成功: type={}, confidence={}", llmIntent.getType(), llmIntent.getConfidence());
                 llmIntent.setUserText(text);
                 // 补充文件信息
@@ -141,6 +172,74 @@ public class UserIntentService {
         UserIntent intent = UserIntent.chat();
         intent.setUserText(text);
         return intent;
+    }
+
+    /**
+     * 判断是否为解析类意图
+     */
+    private boolean isParseIntent(UserIntent.Type type) {
+        return type == UserIntent.Type.PARSE_FILE ||
+               type == UserIntent.Type.PARSE_IMAGE ||
+               type == UserIntent.Type.PARSE_AUDIO ||
+               type == UserIntent.Type.PARSE_VIDEO;
+    }
+
+    /**
+     * 意图分类上下文
+     */
+    @lombok.Data
+    @lombok.AllArgsConstructor
+    public static class IntentContext {
+        private String sessionId;
+        private boolean hasAttachments;
+        private boolean sessionHasFiles;
+        private List<Map<String, String>> historyMessages;
+    }
+
+    /**
+     * 提取对话历史用于意图分类
+     * 将 AIChatRequest 中的历史消息转换为 Map 格式
+     */
+    private List<Map<String, String>> extractHistoryForIntentClassification(AIChatRequest request) {
+        List<Map<String, String>> result = new ArrayList<>();
+
+        // 优先使用 historyMessages（新格式）
+        if (request.getHistoryMessages() != null && !request.getHistoryMessages().isEmpty()) {
+            for (ChatMessage msg : request.getHistoryMessages()) {
+                Map<String, String> historyItem = new HashMap<>();
+                historyItem.put("role", msg.getRole());
+
+                // 提取文本内容
+                Object msgContent = msg.getContent();
+                if (msgContent instanceof String) {
+                    historyItem.put("content", (String) msgContent);
+                } else if (msgContent instanceof List) {
+                    // 多模态消息，提取文本部分
+                    StringBuilder textBuilder = new StringBuilder();
+                    @SuppressWarnings("unchecked")
+                    List<ChatMessageContent> contents = (List<ChatMessageContent>) msgContent;
+                    for (ChatMessageContent c : contents) {
+                        if (c.getText() != null) {
+                            textBuilder.append(c.getText());
+                        }
+                    }
+                    if (textBuilder.length() > 0) {
+                        historyItem.put("content", textBuilder.toString());
+                    }
+                }
+
+                if (historyItem.get("content") != null) {
+                    result.add(historyItem);
+                }
+            }
+        }
+
+        // 如果没有 historyMessages，尝试使用 history（旧格式）
+        if (result.isEmpty() && request.getHistory() != null && !request.getHistory().isEmpty()) {
+            result.addAll(request.getHistory());
+        }
+
+        return result;
     }
 
     /**
@@ -262,9 +361,12 @@ public class UserIntentService {
         }
 
         // 2. 检测文档文件解析意图（PDF、DOCX 等）
+        // 重要：当用户上传文档时，必须先解析文档内容，然后才能让AI回答问题
+        // 因为大多数模型不支持直接处理文档URL
+        // mimeType 设为 null，让 FileParseService.inferMimeType() 从 URL 推断
         if (documents != null && !documents.isEmpty()) {
-            log.info("检测到文档文件，返回 PARSE_FILE");
-            UserIntent intent = UserIntent.parseFile(documents.get(0), "application/octet-stream", null);
+            log.info("检测到文档文件，返回 PARSE_FILE（需要先解析文档内容）");
+            UserIntent intent = UserIntent.parseFile(documents.get(0), null, null);
             intent.setUserText(text);
             return intent;
         }
@@ -491,9 +593,11 @@ public class UserIntentService {
         }
 
         // 从便捷方式的文档提取
+        // 根据 URL 扩展名推断 MIME 类型
         if (request.getDocuments() != null) {
             for (String docUrl : request.getDocuments()) {
-                files.add(new String[]{docUrl, "application/octet-stream"});
+                String mimeType = inferDocumentMimeType(docUrl);
+                files.add(new String[]{docUrl, mimeType});
             }
         }
 
@@ -548,5 +652,86 @@ public class UserIntentService {
      */
     public boolean needsFileParsing(AIChatRequest request) {
         return hasFiles(request.getContent(), request.getImages());
+    }
+
+    /**
+     * 根据文档 URL 推断 MIME 类型
+     * 支持常见文档格式：pdf, doc, docx, xls, xlsx, ppt, pptx, txt, md 等
+     */
+    private String inferDocumentMimeType(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+
+        // 提取扩展名
+        String extension = getFileExtension(url);
+        if (extension == null) {
+            return null;
+        }
+
+        switch (extension.toLowerCase()) {
+            case "pdf":
+                return "application/pdf";
+            case "docx":
+                return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            case "doc":
+                return "application/msword";
+            case "xlsx":
+                return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+            case "xls":
+                return "application/vnd.ms-excel";
+            case "pptx":
+                return "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+            case "ppt":
+                return "application/vnd.ms-powerpoint";
+            case "txt":
+            case "text":
+            case "log":
+                return "text/plain";
+            case "md":
+            case "markdown":
+                return "text/markdown";
+            case "json":
+                return "application/json";
+            case "xml":
+                return "application/xml";
+            case "csv":
+                return "text/csv";
+            case "html":
+            case "htm":
+                return "text/html";
+            default:
+                // 未知扩展名，返回 null 让 FileParseService 进一步推断
+                return null;
+        }
+    }
+
+    /**
+     * 从 URL 提取文件扩展名
+     */
+    private String getFileExtension(String url) {
+        if (url == null || url.isEmpty()) {
+            return null;
+        }
+
+        // 处理 temp:// 协议
+        String path = url;
+        if (url.startsWith("temp://")) {
+            path = url.substring(7);
+        }
+
+        // 移除查询参数
+        int queryIndex = path.indexOf('?');
+        if (queryIndex > 0) {
+            path = path.substring(0, queryIndex);
+        }
+
+        // 提取扩展名
+        int lastDot = path.lastIndexOf('.');
+        if (lastDot > 0 && lastDot < path.length() - 1) {
+            return path.substring(lastDot + 1).toLowerCase();
+        }
+
+        return null;
     }
 }

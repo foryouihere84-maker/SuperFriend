@@ -1,0 +1,321 @@
+# ============================================================
+# SuperFriend Linux Production Configuration
+# ============================================================
+# Usage:
+#   java -jar app.jar --spring.config.location=file:./application-linux.yml
+#
+# Or set environment variable:
+#   export SPRING_CONFIG_LOCATION=file:/opt/superfriend/config/application-linux.yml
+# ============================================================
+
+spring:
+  application:
+    name: superfriend
+  config:
+    import: classpath:model-config.yml
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 100MB
+      file-size-threshold: 2KB
+  datasource:
+    # Use environment variables for database connection
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:superfriend}?useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 30000
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  # Async task thread pool (optimized for 4-core 4GB server)
+  task:
+    execution:
+      pool:
+        core-size: 8
+        max-size: 16
+        queue-capacity: 40
+        keep-alive: 60s
+      thread-name-prefix: sf-async-
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.superfriend.superfriend.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: ${JWT_SECRET:superfriend-secret-key-2024-very-long-key-for-jwt-token-generation-must-be-at-least-256-bits-long}
+  expiration: 604800000
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+  tomcat:
+    connection-timeout: 300000
+    # Tomcat thread pool (optimized for 4-core 4GB server)
+    threads:
+      max: 100
+      min-spare: 10
+    max-connections: 200
+    accept-count: 50
+  mvc:
+    cors:
+      allowed-origins: "*"
+      allowed-methods: "*"
+      allowed-headers: "*"
+    async:
+      request-timeout: 300000
+
+# Springdoc OpenAPI (Swagger) Configuration
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+# ============================================================
+# MCP Host Configuration
+# ============================================================
+mcp:
+  host:
+    # Idle timeout (ms), default 10 minutes
+    idle-timeout-ms: 6000000
+    # Enable idle check (true=enabled, false=disabled)
+    enable-idle-check: false
+  # MCP config file path (for deployment)
+  config-path: ${MCP_CONFIG_PATH:/opt/superfriend/config/mcp-servers-config.json}
+  # MCP local store path (for caching npm/python packages)
+  local-store-path: ${MCP_LOCAL_STORE_PATH:/opt/superfriend/mcp-local}
+  # npm registry mirror (optional, for faster download)
+  npm-registry: ${NPM_REGISTRY:}
+  # PyPI index mirror (optional, for faster download)
+  pypi-index: ${PYPI_INDEX:}
+
+# ============================================================
+# Skills Configuration (Linux Paths)
+# ============================================================
+skills:
+  system:
+    # External skills directory (recommended for production)
+    path: ${SKILLS_SYSTEM_PATH:/opt/superfriend/skills/system}
+  project:
+    path: ${SKILLS_PROJECT_PATH:/opt/superfriend/skills/project}
+
+# ============================================================
+# File Path Configuration (Linux Absolute Paths)
+# ============================================================
+app:
+  file:
+    # Application home directory (base for relative paths)
+    app-home-dir: ${APP_HOME:/opt/superfriend}
+    # Temp directory (user uploads, etc.)
+    temp-dir: ${TEMP_DIR:/opt/superfriend/uploads/temp}
+    # Sandbox root directory (uses system temp)
+    sandbox-dir: ${SANDBOX_DIR:/tmp/superfriend_sandbox}
+    # Skills directory
+    skills-dir: ${skills.system.path}
+    # Execution trace directory
+    trace-dir: ${TRACE_DIR:/opt/superfriend/traces}
+    # Export directory
+    export-dir: ${EXPORT_DIR:/tmp/superfriend_sandbox/exports}
+    # Shared directory
+    shared-dir: ${SHARED_DIR:/tmp/superfriend_sandbox/shared}
+    # Skill output directory (all generated files go here)
+    skill-output-dir: ${SKILL_OUTPUT_DIR:/opt/superfriend/uploads/skill_outputs}
+    # Temp file TTL (hours)
+    temp-file-ttl-hours: 24
+
+# ============================================================
+# Logging Configuration
+# ============================================================
+logging:
+  level:
+    root: INFO
+    com.superfriend.superfriend.service: INFO
+    com.superfriend.superfriend.agent: DEBUG
+  file:
+    name: /opt/superfriend/logs/superfriend.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+      total-size-cap: 1GB
+
+# ============================================================
+# Observability Configuration
+# ============================================================
+observability:
+  langfuse:
+    enabled: ${LANGFUSE_ENABLED:false}
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+    host: https://cloud.langfuse.com
+  arize:
+    enabled: ${ARIZE_ENABLED:false}
+    api-key: ${ARIZE_API_KEY:}
+    space-id: ${ARIZE_SPACE_ID:}
+    model-id: superfriend-agent
+
+# ============================================================
+# Cost Tracking Configuration
+# ============================================================
+cost-tracking:
+  enabled: true
+  daily-budget: ${DAILY_BUDGET:10.0}
+  monthly-budget: ${MONTHLY_BUDGET:100.0}
+  alert-threshold: 0.8
+
+# ============================================================
+# Knowledge Extraction Configuration
+# ============================================================
+knowledge:
+  extraction:
+    min-messages: 1
+    max-messages-to-analyze: 15
+    auto-extract-on-finalize: true
+    auto-extract-on-save: false
+    min-text-length: 2000
+    enable-text-length-trigger: true
+    delay-seconds: 900
+
+# ============================================================
+# Aliyun OSS Configuration
+# ============================================================
+aliyun:
+  oss:
+    enabled: ${ALIYUN_OSS_ENABLED:false}
+    endpoint: ${ALIYUN_OSS_ENDPOINT:oss-cn-beijing.aliyuncs.com}
+    access-key-id: ${ALIYUN_ACCESS_KEY:}
+    access-key-secret: ${ALIYUN_ACCESS_SECRET:}
+    bucket-name: ${ALIYUN_OSS_BUCKET:superfriend-skills-for-user-resource}
+
+# ============================================================
+# OrioSearch Configuration (Self-hosted Search Aggregator)
+# ============================================================
+oriosearch:
+  enabled: ${ORIOSEARCH_ENABLED:false}
+  base-url: ${ORIOSEARCH_URL:http://localhost:8000}
+  timeout-ms: 15000
+  max-results: 5
+  include-answer: true
+  rerank-results: false
+
+# ============================================================
+# Hot News Configuration
+# ============================================================
+news:
+  oriosearch:
+    time-range: day
+    queries: AI,Technology,Internet
+    engines:
+
+# ============================================================
+# Tencent COS Configuration
+# ============================================================
+tencent:
+  cos:
+    enabled: ${TENCENT_COS_ENABLED:false}
+    secret-id: ${TENCENT_SECRET_ID:}
+    secret-key: ${TENCENT_SECRET_KEY:}
+    bucket-name: ${TENCENT_COS_BUCKET:sf-skills-resource-1420445939}
+    region: ${TENCENT_COS_REGION:ap-beijing}
+
+# ============================================================
+# Node Enrichment Configuration
+# ============================================================
+node-enrichment:
+  enabled: true
+  avatar-max-size: 1048576
+  image-max-size: 3145728
+  image-count: 2
+
+# ============================================================
+# Zhipu AI Configuration (Image/Audio/Video Generation)
+# ============================================================
+zhipu:
+  api:
+    enabled: ${ZHIPU_ENABLED:false}
+    key: ${ZHIPU_API_KEY:}
+  image:
+    model: cogview-4
+    default-size: 1024x1024
+  audio:
+    model: glm-tts
+    default-voice: female
+    default-speed: 1.0
+    default-format: mp3
+  video:
+    model: cogvideox-2
+    poll-interval-ms: 5000
+    timeout-ms: 600000
+
+# ============================================================
+# Stable Diffusion Configuration (Local Deployment)
+# ============================================================
+sd:
+  api:
+    enabled: ${SD_ENABLED:false}
+    url: ${SD_URL:http://localhost:7860}
+    key: ${SD_KEY:}
+  default:
+    steps: 30
+    cfg-scale: 7.0
+    width: 512
+    height: 512
+    sampler: "Euler a"
+    negative-prompt: ""
+
+# ============================================================
+# Bash Sandbox Configuration (Linux)
+# ============================================================
+# Deployment Notes:
+# 1. Copy src/main/resources/mcp-servers/bash-sandbox to server
+# 2. Set BASH_SANDBOX_PATH environment variable
+#    Example: export BASH_SANDBOX_PATH=/opt/superfriend/mcp-servers/bash-sandbox/dist/index.js
+# 3. Ensure Node.js is installed and accessible
+# 4. For .NET skills, ensure dotnet SDK is installed
+# ============================================================
+bash-sandbox:
+  enabled: true
+  # Linux sandbox root directory
+  root-dir: /tmp/superfriend_sandbox
+  # Shared directory
+  shared-dir: /tmp/superfriend_sandbox/shared
+  # Export directory
+  export-dir: /tmp/superfriend_sandbox/exports
+  # Default command execution timeout (ms)
+  default-timeout-ms: 60000
+  # Max concurrent sessions
+  max-concurrent-sessions: 10
+  # Resource reserve ratio (0.0 - 1.0)
+  resource-reserve-ratio: 0.2
+  # Session timeout (ms), default 30 minutes
+  session-timeout-ms: 1800000
+  # Max command length
+  max-command-length: 8192
+  # Max output size (bytes), default 10MB
+  max-output-bytes: 10485760
+  # Disable on Windows (not applicable for Linux)
+  disable-on-windows: false
+  # MCP Server name
+  mcp-server-name: bash-sandbox
+
+# ============================================================
+# Skill Executor Configuration
+# ============================================================
+skill:
+  executor:
+    # Default script execution timeout (ms)
+    default-timeout-ms: 300000
+    # Build timeout (ms)
+    build-timeout-ms: 180000

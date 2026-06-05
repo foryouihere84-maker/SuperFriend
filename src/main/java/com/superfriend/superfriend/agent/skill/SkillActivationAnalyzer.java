@@ -12,21 +12,21 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class SkillActivationAnalyzer {
-    
+
     @Value("${skills.activation.default-threshold:0.3}")
-    private double defaultThreshold;
-    
+    private double defaultThreshold = 0.3;
+
     @Value("${skills.activation.base-score-weight:0.2}")
-    private double baseScoreWeight;
-    
+    private double baseScoreWeight = 0.2;
+
     @Value("${skills.activation.use-when-score-weight:0.4}")
-    private double useWhenScoreWeight;
-    
+    private double useWhenScoreWeight = 0.4;
+
     @Value("${skills.activation.keyword-score-weight:0.3}")
-    private double keywordScoreWeight;
-    
+    private double keywordScoreWeight = 0.3;
+
     @Value("${skills.activation.context-score-weight:0.1}")
-    private double contextScoreWeight;
+    private double contextScoreWeight = 0.1;
     
     private static final Pattern USE_WHEN_PATTERN = Pattern.compile(
         "USE WHEN\\s+(.+?)(?=\\n|$)", 

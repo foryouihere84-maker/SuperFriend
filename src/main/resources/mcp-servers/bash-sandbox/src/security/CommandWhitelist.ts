@@ -873,10 +873,23 @@ export const WINDOWS_COMMANDS: Set<string> = new Set([
 export function isCommandAllowed(command: string, isWindows: boolean): boolean {
     if (isWindows) {
         const cmd = command.toLowerCase().split(/\s+/)[0];
-        return WINDOWS_COMMANDS.has(cmd);
+        // Windows: 如果命令在白名单中，允许
+        if (WINDOWS_COMMANDS.has(cmd)) {
+            return true;
+        }
+        // Windows: 允许所有 .exe, .bat, .cmd, .ps1 文件
+        if (/\.(exe|bat|cmd|ps1)$/i.test(cmd)) {
+            return true;
+        }
+        // Windows: 允许带路径的命令（如 C:\Program Files\...）
+        if (/^[a-zA-Z]:[\\\/]/.test(cmd)) {
+            return true;
+        }
+        return false;
     }
 
     const mainCommand = extractMainCommand(command);
+    const commandName = path.basename(mainCommand);
 
     // 检查完整路径
     if (ALL_ALLOWED_LINUX.has(mainCommand)) {
@@ -884,13 +897,61 @@ export function isCommandAllowed(command: string, isWindows: boolean): boolean {
     }
 
     // 检查命令名（basename）
-    const commandName = path.basename(mainCommand);
     if (LINUX_COMMAND_NAMES.has(commandName)) {
         return true;
     }
 
     // 检查shell内置命令
     if (SHELL_BUILTINS.has(commandName)) {
+        return true;
+    }
+
+    // 【新增】Git Bash 环境特殊处理
+    // Git Bash 常见路径前缀
+    const gitBashPrefixes = [
+        '/mingw64/bin/',
+        '/mingw32/bin/',
+        '/usr/bin/',
+        '/bin/',
+        '/opt/bin/'
+    ];
+
+    // 检查是否是 Git Bash 路径下的命令
+    for (const prefix of gitBashPrefixes) {
+        if (mainCommand.startsWith(prefix)) {
+            const cmdName = mainCommand.slice(prefix.length);
+            if (LINUX_COMMAND_NAMES.has(cmdName) || SHELL_BUILTINS.has(cmdName)) {
+                return true;
+            }
+        }
+    }
+
+    // 【新增】允许常见的无路径命令（Git Bash 环境下）
+    // 这些命令在 Git Bash 中通常可用但可能不在标准路径
+    const commonGitBashCommands = new Set([
+        'python', 'python3', 'pip', 'pip3', 'node', 'npm', 'npx', 'yarn', 'pnpm',
+        'git', 'curl', 'wget', 'ssh', 'scp', 'rsync', 'tar', 'gzip', 'unzip',
+        'grep', 'sed', 'awk', 'find', 'sort', 'uniq', 'cut', 'tr', 'head', 'tail',
+        'cat', 'ls', 'cp', 'mv', 'rm', 'mkdir', 'rmdir', 'touch', 'chmod',
+        'docker', 'docker-compose', 'kubectl', 'helm', 'terraform',
+        'java', 'javac', 'mvn', 'gradle', 'go', 'cargo', 'rustc',
+        'mysql', 'psql', 'redis-cli', 'mongo', 'mongosh',
+        'jq', 'yq', 'rg', 'fd', 'bat', 'exa', 'delta',
+        'code', 'cursor', 'vim', 'nvim', 'nano',
+        'make', 'cmake', 'gcc', 'g++', 'clang', 'clang++'
+    ]);
+
+    if (commonGitBashCommands.has(commandName)) {
+        return true;
+    }
+
+    // 允许带路径的本地命令（如 ./script.sh, /home/user/bin/custom）
+    if (mainCommand.startsWith('./') || mainCommand.startsWith('/') || mainCommand.startsWith('../')) {
+        return true;
+    }
+
+    // 允许环境变量形式的命令（如 $HOME/bin/script）
+    if (mainCommand.startsWith('$')) {
         return true;
     }
 

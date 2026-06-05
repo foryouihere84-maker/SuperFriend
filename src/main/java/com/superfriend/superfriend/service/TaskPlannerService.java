@@ -88,7 +88,7 @@ public class TaskPlannerService {
 
     @Autowired
     @Lazy
-    private KnowledgeExtractorService knowledgeExtractorService;
+    private MemoryPalaceService memoryPalaceService;
 
     @Autowired
     @Lazy
@@ -164,7 +164,7 @@ public class TaskPlannerService {
 
         for (int attempt = 1; attempt <= COMPLEXITY_CHECK_MAX_RETRIES; attempt++) {
             try {
-                String response = callLLMNonStream(prompt, modelConfig.getModelId(), modelConfig.getApiUrl(), modelConfig.getApiKey());
+                String response = callLLMNonStream(prompt, modelConfig.getModelId(), modelConfig.getApiUrl(), modelConfig.getApiKey(), null, userId);
 
                 if (response != null && !response.isEmpty()) {
                     boolean result;
@@ -354,7 +354,7 @@ public class TaskPlannerService {
                 "请严格按以下 JSON 格式返回，不要包含其他内容：\n" +
                 "{\"summary\": \"计划摘要（一句话描述整体方案）\", \"steps\": [{\"description\": \"步骤描述\", \"tool\": \"工具名（可选，不需要工具时留空字符串）\"}]}";
 
-            String response = callLLMNonStream(prompt, modelConfig.getModelId(), modelConfig.getApiUrl(), modelConfig.getApiKey());
+            String response = callLLMNonStream(prompt, modelConfig.getModelId(), modelConfig.getApiUrl(), modelConfig.getApiKey(), sessionId, userId);
             if (response == null) {
                 log.error("LLM 返回空响应，无法生成计划");
                 return null;
@@ -362,7 +362,21 @@ public class TaskPlannerService {
 
             response = extractJson(response);
 
-            JsonNode root = objectMapper.readTree(response);
+            // 验证提取的 JSON 是否有效
+            if (response == null || response.isEmpty() || !response.trim().startsWith("{")) {
+                log.warn("LLM 未返回有效 JSON，计划生成失败，将降级为 ReAct 模式。原始响应: {}",
+                        response != null && response.length() > 200 ? response.substring(0, 200) + "..." : response);
+                return null;
+            }
+
+            JsonNode root;
+            try {
+                root = objectMapper.readTree(response);
+            } catch (Exception e) {
+                log.warn("JSON 解析失败，计划生成失败，将降级为 ReAct 模式。错误: {}, JSON: {}",
+                        e.getMessage(), response.length() > 200 ? response.substring(0, 200) + "..." : response);
+                return null;
+            }
             String summary = root.path("summary").asText("无摘要");
             JsonNode stepsNode = root.path("steps");
 
@@ -596,9 +610,8 @@ public class TaskPlannerService {
                 stepCompleteData.put("stepNumber", step.getStepNumber());
                 stepCompleteData.put("description", step.getDescription());
                 stepCompleteData.put("duration", duration);
-                String preview = stepResult != null && stepResult.length() > 200
-                    ? stepResult.substring(0, 200) + "..." : stepResult;
-                stepCompleteData.put("result", preview);
+                // 发送完整结果，不再截断
+                stepCompleteData.put("result", stepResult);
                 stepCompleteData.put("planId", planId);
                 stepCompleteData.put("totalSteps", steps.size());
                 stepCompleteData.put("completedSteps", step.getStepNumber());
@@ -652,6 +665,12 @@ public class TaskPlannerService {
                 if (stepResult != null && !stepResult.isEmpty()) {
                     allStepResults.append("步骤 ").append(step.getStepNumber()).append("（").append(step.getDescription()).append("）的结果：\n");
                     allStepResults.append(stepResult).append("\n\n");
+
+                    // 【关键修复】将步骤结果添加到 messages 中，让下一个步骤能看到
+                    Map<String, Object> stepResultMsg = new HashMap<>();
+                    stepResultMsg.put("role", "assistant");
+                    stepResultMsg.put("content", "[步骤" + step.getStepNumber() + "完成] " + stepResult);
+                    messages.add(stepResultMsg);
                 }
 
                 ExecutionCheckpointService.ExecutionState stepState = new ExecutionCheckpointService.ExecutionState();
@@ -681,24 +700,14 @@ public class TaskPlannerService {
                 }
                 planDTO.setCompletedSteps(step.getStepNumber());
 
-                // 【改进】步骤完成后执行知识提取
+                // 【改进】步骤完成后执行记忆提取
                 if (enableKnowledgeExtraction && stepResult != null && !stepResult.isEmpty()) {
                     try {
-                        // 构建消息用于知识提取
-                        List<Map<String, Object>> extractMessages = new ArrayList<>();
-                        Map<String, Object> userMsg = new HashMap<>();
-                        userMsg.put("role", "user");
-                        userMsg.put("content", step.getDescription());
-                        extractMessages.add(userMsg);
-                        Map<String, Object> assistantMsg = new HashMap<>();
-                        assistantMsg.put("role", "assistant");
-                        assistantMsg.put("content", stepResult);
-                        extractMessages.add(assistantMsg);
-
-                        knowledgeExtractorService.extractFromConversation(userId, sessionId, extractMessages, model);
-                        log.info("步骤 {} 知识提取完成", step.getStepNumber());
+                        // 使用记忆宫殿系统提取记忆
+                        memoryPalaceService.createFromConversationAsync(userId, sessionId, step.getDescription(), stepResult);
+                        log.info("步骤 {} 记忆提取完成", step.getStepNumber());
                     } catch (Exception keEx) {
-                        log.warn("步骤 {} 知识提取失败: {}", step.getStepNumber(), keEx.getMessage());
+                        log.warn("步骤 {} 记忆提取失败: {}", step.getStepNumber(), keEx.getMessage());
                     }
                 }
 
@@ -953,7 +962,7 @@ public class TaskPlannerService {
             summaryMsg.put("content", summaryPrompt);
             messages.add(summaryMsg);
 
-            String summary = callLLMNonStream(summaryPrompt, effectiveModel, effectiveApiUrl, effectiveApiKey);
+            String summary = callLLMNonStream(summaryPrompt, effectiveModel, effectiveApiUrl, effectiveApiKey, sessionId, userId);
 
             AIChatResponse finalResp = new AIChatResponse();
             finalResp.setContent(summary);
@@ -1078,7 +1087,7 @@ public class TaskPlannerService {
                 String role = (String) msg.get("role");
                 String content = (String) msg.get("content");
                 if (content != null && !content.isEmpty()) {
-                    stepPrompt += role + ": " + (content.length() > 500 ? content.substring(0, 500) + "..." : content) + "\n";
+                    stepPrompt += role + ": " + (content.length() > 5000 ? content.substring(0, 5000) + "..." : content) + "\n";
                 }
             }
         }
@@ -1107,7 +1116,12 @@ public class TaskPlannerService {
         Map<String, Object> sysMsg = new HashMap<>();
         sysMsg.put("role", "system");
         sysMsg.put("content", "你正在执行任务计划的一个步骤。请专注于完成当前步骤的任务，给出简洁的结果。" +
-            "可用工具格式为 server__tool_name。完成当前步骤后，直接给出结果，不要继续执行后续步骤。");
+            "可用工具格式为 server__tool_name。完成当前步骤后，直接给出结果，不要继续执行后续步骤。\n\n" +
+            "⚡ SKILLS 工作流提示：\n" +
+            "- 如果上一步调用了 load_skill 并返回了技能详情，根据详情中的 Instructions 和 Available Scripts 决定下一步\n" +
+            "- 执行技能脚本：使用 run_skill_script(skill_name, script_name, parameters)\n" +
+            "- 读取参考文档：使用 read_skill_resource(skill_name, resource_path)\n" +
+            "- 生成文档（Word/PDF/Excel）时，必须使用 run_skill_script，不要直接用 bash-sandbox 写文件");
         stepMessages.add(sysMsg);
 
         Map<String, Object> userStepMsg = new HashMap<>();
@@ -1149,7 +1163,7 @@ public class TaskPlannerService {
                 onResponse.accept(progressResp);
             }
 
-            String stepResponse = callLLMWithToolsNonStream(stepMessages, model, availableTools, apiUrl, apiKey);
+            String stepResponse = callLLMWithToolsNonStream(stepMessages, model, availableTools, apiUrl, apiKey, sessionId, userId);
             if (stepResponse == null) {
                 break;
             }
@@ -1265,8 +1279,14 @@ public class TaskPlannerService {
                         .reduce((a, b) -> a + "\n" + b).orElse("") : "")
                     : "工具调用失败：" + toolResult.getError();
 
-                if (resultContent.length() > 1000) {
-                    resultContent = resultContent.substring(0, 1000) + "...[截断]";
+                // 【修复】对于关键工具（load_skill, read_skill_resource等）不截断结果
+                // 这些工具返回的内容对后续执行至关重要
+                boolean isCriticalTool = "load_skill".equals(functionName)
+                    || "read_skill_resource".equals(functionName)
+                    || functionName.contains("get_skill");
+
+                if (!isCriticalTool && resultContent.length() > 5000) {
+                    resultContent = resultContent.substring(0, 5000) + "...[截断，完整内容请查看日志]";
                 }
 
                 Map<String, Object> toolMsg = new HashMap<>();
@@ -1312,7 +1332,7 @@ public class TaskPlannerService {
         return false;
     }
 
-    private String callLLMNonStream(String prompt, String model, String apiUrl, String apiKey) throws Exception {
+    private String callLLMNonStream(String prompt, String model, String apiUrl, String apiKey, String sessionId, Long userId) throws Exception {
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> msg = new HashMap<>();
         msg.put("role", "user");
@@ -1322,6 +1342,8 @@ public class TaskPlannerService {
         LLMRequest request = LLMRequest.fromConfig(model, apiUrl, apiKey)
                 .toBuilder()
                 .messages(messages)
+                .sessionId(sessionId)
+                .userId(userId)
                 .build();
 
         log.info("[TaskPlanner] 调用 LLM (chatComplete): model={}", model);
@@ -1337,7 +1359,9 @@ public class TaskPlannerService {
                                              String model,
                                              List<McpToolDefinition> tools,
                                              String apiUrl,
-                                             String apiKey) throws Exception {
+                                             String apiKey,
+                                             String sessionId,
+                                             Long userId) throws Exception {
         List<ToolDefinitionForLLM> toolDefs = new ArrayList<>();
         if (tools != null && !tools.isEmpty()) {
             for (McpToolDefinition tool : tools) {
@@ -1354,6 +1378,8 @@ public class TaskPlannerService {
         LLMRequest request = LLMRequest.fromConfig(model, apiUrl, apiKey)
                 .toBuilder()
                 .messages(messages)
+                .sessionId(sessionId)
+                .userId(userId)
                 .build();
 
         log.info("[TaskPlanner] 调用 LLM (chatCompleteWithTools): model={}, tools={}", model, toolDefs.size());
@@ -1430,12 +1456,74 @@ public class TaskPlannerService {
     }
 
     private String extractJson(String text) {
-        int braceStart = text.indexOf('{');
-        int braceEnd = text.lastIndexOf('}');
-        if (braceStart >= 0 && braceEnd > braceStart) {
-            return text.substring(braceStart, braceEnd + 1);
+        if (text == null || text.isEmpty()) return text;
+
+        // 去除思考标签
+        String cleaned = text;
+        String[] thinkingTags = {"<think>", "</think>", "<reasoning>", "</reasoning>",
+                "<thought>", "</thought>", "<reflection>", "</reflection>"};
+        for (String tag : thinkingTags) {
+            cleaned = cleaned.replace(tag, "");
         }
-        return text;
+        // 移除 <think>...</think> 块（多行）
+        cleaned = cleaned.replaceAll("<think[\\s\\S]*?</think>", "");
+        cleaned = cleaned.replaceAll("<reasoning[\\s\\S]*?</reasoning>", "");
+
+        int braceStart = cleaned.indexOf('{');
+        int braceEnd = cleaned.lastIndexOf('}');
+        if (braceStart >= 0 && braceEnd > braceStart) {
+            String json = cleaned.substring(braceStart, braceEnd + 1);
+            // 尝试修复常见的 LLM JSON 错误
+            json = fixCommonJsonErrors(json);
+            return json;
+        }
+        return cleaned.trim();
+    }
+
+    /**
+     * 修复 LLM 返回的常见 JSON 错误
+     * 例如：{"steps": [{"tool": ""}]} 末尾多余的 }
+     */
+    private String fixCommonJsonErrors(String json) {
+        if (json == null || json.isEmpty()) return json;
+
+        // 先尝试直接解析，如果成功就不修复
+        try {
+            objectMapper.readTree(json);
+            return json;
+        } catch (Exception ignored) {
+            // 需要修复
+        }
+
+        // 修复策略：从外层开始，逐步尝试移除末尾多余的 }
+        String fixed = json.trim();
+        // 统计 { 和 } 的数量
+        long openBraces = fixed.chars().filter(c -> c == '{').count();
+        long closeBraces = fixed.chars().filter(c -> c == '}').count();
+
+        if (closeBraces > openBraces) {
+            // 从末尾移除多余的 }
+            int excess = (int) (closeBraces - openBraces);
+            int removed = 0;
+            StringBuilder sb = new StringBuilder(fixed);
+            for (int i = sb.length() - 1; i >= 0 && removed < excess; i--) {
+                if (sb.charAt(i) == '}') {
+                    sb.deleteCharAt(i);
+                    removed++;
+                }
+            }
+            fixed = sb.toString();
+            log.info("修复 JSON：移除了 {} 个多余的 }}", removed);
+        }
+
+        // 再次验证
+        try {
+            objectMapper.readTree(fixed);
+            return fixed;
+        } catch (Exception e) {
+            log.warn("JSON 修复后仍无法解析: {}", e.getMessage());
+            return json; // 返回原始内容
+        }
     }
 
     private void sendPlanError(Consumer<AIChatResponse> onResponse, String sessionId, String model, String message) {

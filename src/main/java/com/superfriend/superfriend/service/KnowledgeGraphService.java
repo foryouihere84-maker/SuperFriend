@@ -936,8 +936,8 @@ public class KnowledgeGraphService {
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("📊 用户知识图谱：\n");
-        sb.append("```\n");
+        sb.append("## 🕸️ 知识图谱（当前对话）\n\n");
+        sb.append("以下是从当前对话中提取的知识，可在回答中参考：\n\n");
 
         // 按类型分组
         Map<String, List<KnowledgeNode>> groupedNodes = nodes.stream()
@@ -946,63 +946,61 @@ public class KnowledgeGraphService {
         String[] typeOrder = {"TECHNOLOGY", "PROJECT", "PREFERENCE", "TASK", "ERROR", "SOLUTION", "CONCEPT", "USER"};
         String[] typeLabels = {"技术栈", "项目", "偏好", "任务", "错误", "解决方案", "概念", "用户信息"};
 
+        // 实体表格
+        sb.append("### 实体\n");
+        sb.append("| 名称 | 类型 | 描述 | 重要性 |\n");
+        sb.append("|------|------|------|--------|\n");
+
         for (int i = 0; i < typeOrder.length; i++) {
             String type = typeOrder[i];
             List<KnowledgeNode> typeNodes = groupedNodes.get(type);
             if (typeNodes != null && !typeNodes.isEmpty()) {
-                sb.append("【").append(typeLabels[i]).append("】\n");
                 for (KnowledgeNode node : typeNodes) {
-                    sb.append("- ").append(node.getName());
+                    sb.append("| ").append(node.getName()).append(" ");
+                    sb.append("| ").append(typeLabels[i]).append(" ");
 
-                    // properties 中的 level 信息
-                    if (node.getProperties() != null && !node.getProperties().isEmpty()) {
-                        try {
-                            Map<String, Object> props = objectMapper.readValue(node.getProperties(),
-                                new TypeReference<Map<String, Object>>() {});
-                            if (props.containsKey("level")) {
-                                sb.append(" (").append(props.get("level")).append(")");
-                            }
-                        } catch (Exception e) {
-                            // ignore
-                        }
-                    }
-
-                    // 详细描述
+                    // 描述
+                    String desc = "";
                     if (node.getDescription() != null && !node.getDescription().isEmpty()) {
-                        sb.append(" - ").append(node.getDescription());
+                        desc = node.getDescription().length() > 30
+                            ? node.getDescription().substring(0, 30) + "..."
+                            : node.getDescription();
                     }
+                    sb.append("| ").append(desc).append(" ");
 
-                    // 重要性标记
-                    if (node.getImportance() != null && node.getImportance() >= 8) {
-                        sb.append(" [重要]");
+                    // 重要性
+                    String importance = "普通";
+                    if (node.getImportance() != null) {
+                        if (node.getImportance() >= 8) importance = "⭐⭐⭐";
+                        else if (node.getImportance() >= 6) importance = "⭐⭐";
+                        else if (node.getImportance() >= 4) importance = "⭐";
                     }
-
-                    sb.append("\n");
+                    sb.append("| ").append(importance).append(" |\n");
                 }
-                sb.append("\n");
             }
         }
 
-        // 添加关键关系
+        // 关系表格
         if (!relations.isEmpty()) {
-            sb.append("【关键关系】\n");
+            sb.append("\n### 关系\n");
+            sb.append("| 主体 | 关系 | 客体 |\n");
+            sb.append("|------|------|------|\n");
             int relCount = 0;
             for (KnowledgeRelation rel : relations) {
-                if (relCount++ >= 5) break;
+                if (relCount++ >= 8) break;
                 if (rel.getSourceNode() != null && rel.getTargetNode() != null) {
-                    sb.append("- ").append(rel.getSourceNode().getName())
-                      .append(" ").append(GraphContextDTO.getRelationTypeName(rel.getRelationType()))
-                      .append(" ").append(rel.getTargetNode().getName())
-                      .append("\n");
+                    sb.append("| ").append(rel.getSourceNode().getName()).append(" ");
+                    sb.append("| ").append(GraphContextDTO.getRelationTypeName(rel.getRelationType())).append(" ");
+                    sb.append("| ").append(rel.getTargetNode().getName()).append(" |\n");
                 }
             }
         }
 
-        sb.append("```\n");
+        sb.append("\n💡 **提示**: 这些是当前对话中提取的知识，可在回答中引用。\n");
 
         String result = sb.toString();
         if (result.length() > MAX_CONTEXT_LENGTH) {
-            result = result.substring(0, MAX_CONTEXT_LENGTH) + "\n...(更多知识已省略)\n```\n";
+            result = result.substring(0, MAX_CONTEXT_LENGTH) + "\n...(更多知识已省略)\n";
         }
 
         return result;

@@ -296,29 +296,44 @@ public static class EditContentCommand
     {
         var inputOpt = new Option<string>("--input") { Description = "Input DOCX file", Required = true };
         var outputOpt = new Option<string>("--output") { Description = "Output file path" };
-        var mappingOpt = new Option<string>("--mapping") { Description = "JSON file mapping placeholder names to values", Required = true };
+        var mappingOpt = new Option<string>("--mapping") { Description = "JSON file mapping placeholder names to values" };
+        var dataOpt = new Option<string>("--data") { Description = "JSON string mapping placeholder names to values (alternative to --mapping)" };
         var patternOpt = new Option<string>("--pattern") { Description = "Placeholder pattern with capture group for the name" };
         patternOpt.DefaultValueFactory = _ => @"\{\{(\w+)\}\}";
 
-        var cmd = new Command("fill-placeholders", "Replace placeholders with values from a mapping file")
+        var cmd = new Command("fill-placeholders", "Replace placeholders with values from a mapping file or JSON string")
         {
-            inputOpt, outputOpt, mappingOpt, patternOpt
+            inputOpt, outputOpt, mappingOpt, dataOpt, patternOpt
         };
 
         cmd.SetAction((parseResult) =>
         {
             var input = parseResult.GetValue(inputOpt)!;
             var output = parseResult.GetValue(outputOpt) ?? input;
-            var mappingPath = parseResult.GetValue(mappingOpt)!;
+            var mappingPath = parseResult.GetValue(mappingOpt);
+            var dataString = parseResult.GetValue(dataOpt);
             var pattern = parseResult.GetValue(patternOpt)!;
 
-            if (!File.Exists(mappingPath)) { Console.Error.WriteLine($"Mapping file not found: {mappingPath}"); return; }
+            // Either --mapping or --data must be provided
+            if (string.IsNullOrEmpty(mappingPath) && string.IsNullOrEmpty(dataString))
+            {
+                Console.Error.WriteLine("Either --mapping or --data must be provided.");
+                return;
+            }
 
-            var mappingJson = File.ReadAllText(mappingPath);
             Dictionary<string, string> mapping;
             try
             {
-                mapping = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson) ?? [];
+                if (!string.IsNullOrEmpty(dataString))
+                {
+                    mapping = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(dataString) ?? [];
+                }
+                else
+                {
+                    if (!File.Exists(mappingPath)) { Console.Error.WriteLine($"Mapping file not found: {mappingPath}"); return; }
+                    var mappingJson = File.ReadAllText(mappingPath);
+                    mapping = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson) ?? [];
+                }
             }
             catch (System.Text.Json.JsonException ex)
             {

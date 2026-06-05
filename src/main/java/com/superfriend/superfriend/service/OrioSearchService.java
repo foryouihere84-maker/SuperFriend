@@ -65,6 +65,18 @@ public class OrioSearchService {
      * @return 搜索结果
      */
     public SearchResult searchWithTimeRange(String query, String timeRange) {
+        return searchWithTimeRangeAndEngines(query, timeRange, null);
+    }
+
+    /**
+     * 执行带时间过滤和指定引擎的搜索
+     *
+     * @param query 搜索查询
+     * @param timeRange 时间过滤范围: "day", "week", "month", "year" 或 null 表示不限制
+     * @param engines 指定搜索引擎，如 "bing news"，null 表示使用默认引擎
+     * @return 搜索结果
+     */
+    public SearchResult searchWithTimeRangeAndEngines(String query, String timeRange, String engines) {
         if (!enabled) {
             log.debug("OrioSearch 未启用");
             return null;
@@ -87,6 +99,11 @@ public class OrioSearchService {
 
             if (timeRange != null && !timeRange.isEmpty()) {
                 requestBody.put("time_range", timeRange);
+            }
+
+            // 如果指定了引擎，添加到请求中（SearXNG 格式）
+            if (engines != null && !engines.isEmpty()) {
+                requestBody.put("engines", engines);
             }
 
             String response = postRequest(baseUrl + "/search", requestBody);
@@ -191,7 +208,7 @@ public class OrioSearchService {
      * @return 新闻搜索结果
      */
     public SearchResult searchNews(String query) {
-        return searchNews(query, "day");
+        return searchNews(query, "day", null);
     }
 
     /**
@@ -202,6 +219,18 @@ public class OrioSearchService {
      * @return 新闻搜索结果
      */
     public SearchResult searchNews(String query, String timeRange) {
+        return searchNews(query, timeRange, null);
+    }
+
+    /**
+     * 搜索新闻（带时间过滤和指定引擎）
+     *
+     * @param query 新闻搜索查询
+     * @param timeRange 时间过滤范围: "day", "week", "month", "year"
+     * @param engines 指定搜索引擎，如 "bing news"，null 表示使用默认引擎
+     * @return 新闻搜索结果
+     */
+    public SearchResult searchNews(String query, String timeRange, String engines) {
         if (!enabled) {
             log.debug("OrioSearch 未启用");
             return null;
@@ -212,10 +241,13 @@ public class OrioSearchService {
             return null;
         }
 
-        log.info("[OrioSearch新闻] 开始搜索新闻: query={}, timeRange={}", query, timeRange);
+        log.info("[OrioSearch新闻] 开始搜索新闻: query={}, timeRange={}, engines={}", query, timeRange, engines);
         
-        String newsQuery = query + " news";
-        return searchWithTimeRange(newsQuery, timeRange);
+        // 不在关键词中拼接 " news"，SearXNG 不认这种写法
+        // 正确做法：
+        // 1. 不带引擎（走默认）：/search?q=科技新闻&time_range=day
+        // 2. 指定引擎：/search?q=科技新闻&engines=bing news
+        return searchWithTimeRangeAndEngines(query, timeRange, engines);
     }
 
     /**

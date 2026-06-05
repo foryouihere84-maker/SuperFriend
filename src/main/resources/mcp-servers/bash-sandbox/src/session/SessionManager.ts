@@ -142,19 +142,51 @@ export class SessionManager {
     }
 
     private setDefaultEnvironment(
-        env: Map<string, string>, 
-        sessionId: string, 
+        env: Map<string, string>,
+        sessionId: string,
         sessionDir: string
     ): void {
-        env.set('PATH', this.platformAdapter.getDefaultPath());
+        // 【修复】追加而非覆盖系统 PATH
+        const systemPath = process.env.PATH || '';
+        const defaultPath = this.platformAdapter.getDefaultPath();
+        const separator = this.platformAdapter.getEnvironmentSeparator();
+
+        // 将默认路径放在前面，确保优先级，但保留系统路径
+        const combinedPath = defaultPath + separator + systemPath;
+        env.set('PATH', combinedPath);
+
         env.set('HOME', sessionDir);
         env.set('TEMP', path.join(sessionDir, 'tmp'));
         env.set('TMP', path.join(sessionDir, 'tmp'));
         env.set('SANDBOX_SESSION_ID', sessionId);
-        
+
+        // 【新增】继承用户环境变量
+        // 保留常用的用户配置
+        const userEnvKeys = [
+            'USERPROFILE', 'APPDATA', 'LOCALAPPDATA',  // Windows
+            'HOME', 'USER', 'LOGNAME',  // Linux/Mac
+            'NODE_PATH', 'PYTHONPATH', 'GOPATH', 'CARGO_HOME',  // 开发工具
+            'JAVA_HOME', 'M2_HOME', 'GRADLE_HOME',  // Java
+            'EDITOR', 'VISUAL', 'PAGER',  // 编辑器
+            'LANG', 'LC_ALL', 'LC_CTYPE',  // 语言设置
+            'TERM', 'COLORTERM',  // 终端
+            'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY',  // 代理
+            'NUGET_PACKAGES', 'NPM_CONFIG_CACHE'  // 包管理器
+        ];
+
+        for (const key of userEnvKeys) {
+            if (process.env[key] && !env.has(key)) {
+                env.set(key, process.env[key]!);
+            }
+        }
+
         if (!this.platformAdapter.isWindows()) {
-            env.set('LANG', 'C.UTF-8');
-            env.set('LC_ALL', 'C.UTF-8');
+            if (!env.has('LANG')) {
+                env.set('LANG', 'C.UTF-8');
+            }
+            if (!env.has('LC_ALL')) {
+                env.set('LC_ALL', 'C.UTF-8');
+            }
         }
     }
 

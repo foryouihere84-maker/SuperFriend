@@ -110,23 +110,70 @@ public class FileParseService {
             ParseResult result = parser.parse(fileUrl, mimeType);
             result.setOriginalFileName(extractFileName(fileUrl));
 
-            // 解析完成后清理 temp 文件
-            cleanupTempFile(fileUrl);
+            // 不再自动清理 temp 文件，改为会话结束时统一清理
+            // 这样可以支持同一文件被多次引用
+            // cleanupTempFileInternal(fileUrl);
 
             return result;
         } catch (Exception e) {
             log.error("文件解析异常: {}", e.getMessage(), e);
-            // 解析失败时也尝试清理文件
-            cleanupTempFile(fileUrl);
+            // 解析失败也不清理文件，让会话管理器统一处理
+            // cleanupTempFileInternal(fileUrl);
             return ParseResult.failed("文件解析异常: " + e.getMessage());
         }
+    }
+
+    /**
+     * 解析文件（不自动清理 temp 文件）
+     * 用于多文件批量解析场景，避免同一文件被多次引用时已被清理
+     *
+     * @param fileUrl  文件 URL
+     * @param mimeType 文件 MIME 类型
+     * @return 解析结果
+     */
+    public ParseResult parseWithoutCleanup(String fileUrl, String mimeType) {
+        log.info("开始解析文件（不清理）: url={}, mimeType={}", fileUrl, mimeType);
+
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            return ParseResult.failed("文件 URL 为空");
+        }
+
+        if (mimeType == null || mimeType.isEmpty()) {
+            mimeType = inferMimeType(fileUrl);
+            log.info("从 URL 推断 MIME 类型: {}", mimeType);
+        }
+
+        FileParser parser = getParser(mimeType);
+
+        if (parser == null) {
+            log.warn("未找到支持 MIME 类型 {} 的解析器", mimeType);
+            return ParseResult.unsupported(mimeType);
+        }
+
+        log.info("使用解析器: {}", parser.getName());
+
+        try {
+            ParseResult result = parser.parse(fileUrl, mimeType);
+            result.setOriginalFileName(extractFileName(fileUrl));
+            return result;
+        } catch (Exception e) {
+            log.error("文件解析异常: {}", e.getMessage(), e);
+            return ParseResult.failed("文件解析异常: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 清理 temp 文件（公开方法，供外部调用）
+     */
+    public void cleanupTempFile(String fileUrl) {
+        cleanupTempFileInternal(fileUrl);
     }
 
     /**
      * 清理 temp 文件
      * temp://type/fileName -> uploads/temp/type/fileName
      */
-    private void cleanupTempFile(String fileUrl) {
+    private void cleanupTempFileInternal(String fileUrl) {
         if (fileUrl == null || !fileUrl.startsWith("temp://")) {
             return;
         }

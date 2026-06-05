@@ -334,8 +334,8 @@ public class SkillPackageParserService {
                     prompt.append("\n=== ").append(file.getFileName()).append(" ===\n");
                     // 限制内容长度
                     String content = file.getContent();
-                    if (content.length() > 2000) {
-                        content = content.substring(0, 2000) + "\n... (内容已截断)";
+                    if (content.length() > 5000) {
+                        content = content.substring(0, 5000) + "\n... (内容已截断)";
                     }
                     prompt.append(content).append("\n");
                 }

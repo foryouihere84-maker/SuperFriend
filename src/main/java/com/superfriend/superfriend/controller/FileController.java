@@ -1,6 +1,8 @@
 package com.superfriend.superfriend.controller;
 
 import com.superfriend.superfriend.dto.ApiResponse;
+import com.superfriend.superfriend.entity.UserFile;
+import com.superfriend.superfriend.mapper.UserFileMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
@@ -11,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.PostConstruct;
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
@@ -23,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RestController
@@ -38,6 +42,11 @@ public class FileController {
 
     private static final String DEFAULT_UPLOAD_DIR = "uploads/temp";
     private Path uploadPath;
+
+    private static final int MAX_STORAGE_MB = 100;
+
+    @Resource
+    private UserFileMapper userFileMapper;
 
     @PostConstruct
     public void init() {
@@ -272,5 +281,134 @@ public class FileController {
         private List<String> errors;
         private int totalCount;
         private int successCount;
+    }
+
+    // ==================== 用户文件管理接口 ====================
+
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "获取用户文件列表", description = "获取指定用户的所有活跃文件")
+    public ApiResponse<List<UserFileInfo>> getUserFiles(@PathVariable Long userId) {
+        try {
+            List<UserFile> files = userFileMapper.findByUserId(userId);
+            List<UserFileInfo> result = files.stream()
+                    .map(this::convertToUserInfo)
+                    .collect(Collectors.toList());
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("获取用户文件列表失败: userId={}, error={}", userId, e.getMessage());
+            return ApiResponse.error("获取文件列表失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/{userId}/session/{sessionId}")
+    @Operation(summary = "获取会话文件列表", description = "获取指定用户在特定会话中的文件")
+    public ApiResponse<List<UserFileInfo>> getSessionFiles(
+            @PathVariable Long userId,
+            @PathVariable String sessionId) {
+        try {
+            List<UserFile> files = userFileMapper.findByUserIdAndSessionId(userId, sessionId);
+            List<UserFileInfo> result = files.stream()
+                    .map(this::convertToUserInfo)
+                    .collect(Collectors.toList());
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("获取会话文件列表失败: userId={}, sessionId={}, error={}", userId, sessionId, e.getMessage());
+            return ApiResponse.error("获取会话文件列表失败: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/user/{userId}/file/{fileId}")
+    @Operation(summary = "删除用户文件", description = "软删除指定的用户文件")
+    public ApiResponse<Boolean> deleteUserFile(
+            @PathVariable Long userId,
+            @PathVariable String fileId) {
+        try {
+            UserFile file = userFileMapper.findByFileId(fileId);
+            if (file == null) {
+                return ApiResponse.error("文件不存在");
+            }
+            if (!file.getUserId().equals(userId)) {
+                return ApiResponse.error("无权删除此文件");
+            }
+
+            userFileMapper.softDeleteByFileId(fileId);
+
+            if (file.getFilePath() != null) {
+                try {
+                    Path path = Paths.get(file.getFilePath());
+                    Files.deleteIfExists(path);
+                } catch (IOException e) {
+                    log.warn("删除物理文件失败: {}", file.getFilePath());
+                }
+            }
+
+            log.info("用户文件已删除: userId={}, fileId={}", userId, fileId);
+            return ApiResponse.success(true);
+        } catch (Exception e) {
+            log.error("删除用户文件失败: userId={}, fileId={}, error={}", userId, fileId, e.getMessage());
+            return ApiResponse.error("删除文件失败: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/user/{userId}/stats")
+    @Operation(summary = "获取用户存储统计", description = "获取用户的存储空间使用情况")
+    public ApiResponse<StorageStats> getStorageStats(@PathVariable Long userId) {
+        try {
+            UserFileMapper.UserFileStats stats = userFileMapper.getStatsByUserId(userId);
+            long totalSize = stats.getTotalSize();
+            long fileCount = stats.getFileCount();
+            double totalSizeMB = totalSize / (1024.0 * 1024.0);
+            double usedPercent = (totalSizeMB / MAX_STORAGE_MB) * 100;
+
+            StorageStats result = new StorageStats();
+            result.setUserId(userId);
+            result.setTotalSizeBytes(totalSize);
+            result.setTotalSizeMB(Math.round(totalSizeMB * 100) / 100.0);
+            result.setFileCount(fileCount);
+            result.setMaxSizeMB(MAX_STORAGE_MB);
+            result.setUsedPercent(Math.round(usedPercent * 100) / 100.0);
+
+            return ApiResponse.success(result);
+        } catch (Exception e) {
+            log.error("获取存储统计失败: userId={}, error={}", userId, e.getMessage());
+            return ApiResponse.error("获取存储统计失败: " + e.getMessage());
+        }
+    }
+
+    private UserFileInfo convertToUserInfo(UserFile file) {
+        UserFileInfo info = new UserFileInfo();
+        info.setFileId(file.getFileId());
+        info.setFileName(file.getFileName());
+        info.setFileSize(file.getFileSize() != null ? file.getFileSize() : 0L);
+        info.setFileType(file.getFileType() != null ? file.getFileType() : "unknown");
+        info.setMimeType(file.getMimeType());
+        info.setSessionId(file.getSessionId());
+        info.setUploadTime(file.getUploadTime() != null ? file.getUploadTime().toString() : null);
+        info.setLastAccessTime(file.getLastAccessTime() != null ? file.getLastAccessTime().toString() : null);
+        info.setIsSensitive(file.getIsSensitive() != null ? file.getIsSensitive() : false);
+        return info;
+    }
+
+    @Data
+    public static class UserFileInfo {
+        private String fileId;
+        private String fileName;
+        private Long fileSize;
+        private String fileType;
+        private String mimeType;
+        private String sessionId;
+        private String uploadTime;
+        private String lastAccessTime;
+        private Boolean isSensitive;
+    }
+
+    @Data
+    public static class StorageStats {
+        private Long userId;
+        private Long totalSizeBytes;
+        private Double totalSizeMB;
+        private Long fileCount;
+        private Integer maxSizeMB;
+        private Double usedPercent;
     }
 }

@@ -51,7 +51,7 @@ public class ChatController {
 
     @Resource
     @Lazy
-    private DelayedExtractionQueueService delayedExtractionQueueService;
+    private MemoryPalaceService memoryPalaceService;
     @Setter
     @Getter
     private HttpServletRequest httpRequest;
@@ -128,6 +128,17 @@ public class ChatController {
 
             try {
                 String jsonData = objectMapper.writeValueAsString(aiResponse);
+
+                // 调试日志：检查文件类型消息的序列化
+                if ("file".equals(aiResponse.getType()) || "pdf".equals(aiResponse.getType())) {
+                    log.info("SSE 发送文件消息: type={}, hasContent={}, jsonLength={}, resourceId={}, fileName={}",
+                        aiResponse.getType(),
+                        aiResponse.getContent() != null,
+                        jsonData.length(),
+                        aiResponse.getResourceId(),
+                        aiResponse.getFileName());
+                }
+
                 response.getWriter().write("data: " + jsonData + "\n\n");
                 response.getWriter().flush();
                 context.updateActivity();
@@ -382,7 +393,7 @@ public class ChatController {
     }
 
     @PostMapping("/finalize/{sessionId}")
-    @Operation(summary = "结束对话", description = "结束对话并安排延迟知识提取，应在用户关闭/切换对话时调用")
+    @Operation(summary = "结束对话", description = "结束对话并触发记忆提取，应在用户关闭/切换对话时调用")
     public Map<String, Object> finalizeConversation(
             @PathVariable String sessionId,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -390,14 +401,15 @@ public class ChatController {
             ? Long.valueOf(body.get("userId").toString()) : null;
         String model = body != null ? (String) body.get("model") : null;
 
-        log.info("收到结束对话请求（延迟提取）：sessionId={}, userId={}, model={}", sessionId, userId, model);
+        log.info("收到结束对话请求：sessionId={}, userId={}, model={}", sessionId, userId, model);
 
         Map<String, Object> result = new HashMap<>();
 
         try {
-            delayedExtractionQueueService.scheduleDelayedExtraction(sessionId, userId, model);
+            // 使用记忆宫殿系统进行记忆提取
+            contextMangerService.finalizeConversation(sessionId, userId, model);
             result.put("success", true);
-            result.put("message", "已安排延迟知识提取");
+            result.put("message", "记忆提取已完成");
             result.put("sessionId", sessionId);
         } catch (Exception e) {
             log.error("结束对话失败：{}", e.getMessage(), e);
@@ -409,19 +421,18 @@ public class ChatController {
     }
 
     @PostMapping("/extract/{sessionId}")
-    @Operation(summary = "立即提取知识", description = "立即执行知识提取，前端传入对话内容，无条件执行")
+    @Operation(summary = "立即提取记忆", description = "立即执行记忆提取，前端传入对话内容")
     public Map<String, Object> extractNow(
             @PathVariable String sessionId,
             @RequestBody(required = false) Map<String, Object> body) {
         Long userId = body != null && body.get("userId") != null
             ? Long.valueOf(body.get("userId").toString()) : null;
-        String model = body != null ? (String) body.get("model") : null;
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> messages = body != null
             ? (List<Map<String, Object>>) body.get("messages") : null;
 
-        log.info("[手动提取] 收到请求: sessionId={}, userId={}, model={}, messageCount={}",
-            sessionId, userId, model, messages != null ? messages.size() : 0);
+        log.info("[手动提取] 收到请求: sessionId={}, userId={}, messageCount={}",
+            sessionId, userId, messages != null ? messages.size() : 0);
 
         Map<String, Object> result = new HashMap<>();
 
@@ -430,57 +441,58 @@ public class ChatController {
                 log.warn("[手动提取] 消息列表为空: sessionId={}", sessionId);
                 result.put("success", false);
                 result.put("status", "NO_MESSAGES");
-                result.put("message", "对话内容为空，无法提取知识");
+                result.put("message", "对话内容为空，无法提取记忆");
                 result.put("sessionId", sessionId);
                 return result;
             }
 
-            DelayedExtractionQueueService.ExtractionResult extractionResult =
-                delayedExtractionQueueService.executeImmediate(sessionId, userId, model, messages);
+            // 获取最后一条用户消息和助手回复
+            String lastUserMessage = null;
+            String lastAssistantReply = null;
+            for (int i = messages.size() - 1; i >= 0; i--) {
+                Map<String, Object> msg = messages.get(i);
+                String role = (String) msg.get("role");
+                if ("assistant".equals(role) && lastAssistantReply == null) {
+                    lastAssistantReply = (String) msg.get("content");
+                } else if ("user".equals(role) && lastUserMessage == null) {
+                    lastUserMessage = (String) msg.get("content");
+                }
+                if (lastUserMessage != null && lastAssistantReply != null) {
+                    break;
+                }
+            }
 
-            switch (extractionResult) {
-                case SUCCESS:
-                    result.put("success", true);
-                    result.put("status", "SUCCESS");
-                    result.put("message", "知识提取已触发");
-                    break;
-                case EXTRACTING:
-                    result.put("success", false);
-                    result.put("status", "EXTRACTING");
-                    result.put("message", "知识提取正在进行中，请稍后再试");
-                    break;
-                case FAILED:
-                    result.put("success", false);
-                    result.put("status", "FAILED");
-                    result.put("message", "知识提取失败");
-                    break;
+            if (lastUserMessage != null && userId != null) {
+                memoryPalaceService.createFromConversationAsync(userId, sessionId, lastUserMessage, lastAssistantReply);
+                result.put("success", true);
+                result.put("status", "SUCCESS");
+                result.put("message", "记忆提取已触发");
+            } else {
+                result.put("success", false);
+                result.put("status", "NO_CONTENT");
+                result.put("message", "无法提取有效的对话内容");
             }
             result.put("sessionId", sessionId);
         } catch (Exception e) {
             log.error("[手动提取] 失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
             result.put("success", false);
             result.put("status", "ERROR");
-            result.put("message", "知识提取失败：" + e.getMessage());
+            result.put("message", "记忆提取失败：" + e.getMessage());
         }
 
         return result;
     }
 
     @GetMapping("/extraction-status/{sessionId}")
-    @Operation(summary = "查询提取状态", description = "查询指定会话的知识提取状态")
+    @Operation(summary = "查询提取状态", description = "查询指定会话的记忆提取状态")
     public Map<String, Object> getExtractionStatus(@PathVariable String sessionId) {
         Map<String, Object> result = new HashMap<>();
 
-        DelayedExtractionQueueService.ExtractionStatus status =
-            delayedExtractionQueueService.getExtractionStatus(sessionId);
-
+        // 记忆宫殿系统是实时提取的，始终返回已完成
         result.put("sessionId", sessionId);
-        result.put("status", status.getStatus());
-        result.put("message", status.getMessage());
-        result.put("inProgress", status.isInProgress());
-        if (status.getRemainingSeconds() != null) {
-            result.put("remainingSeconds", status.getRemainingSeconds());
-        }
+        result.put("status", "COMPLETED");
+        result.put("message", "记忆提取已完成");
+        result.put("inProgress", false);
 
         return result;
     }

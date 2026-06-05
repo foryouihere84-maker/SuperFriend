@@ -110,9 +110,14 @@
       "Bash(awk *)",
       "Bash(tail -n +2258 \"C:/Users/iherefor/Desktop/project/SuperFriend/ui/src/views/Chat/index.vue\")",
       "Read(//tmp/**)",
-      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\([{'name':m['name'],'configId':m['configId']} for m in data.get\\('data',[]\\)], indent=2\\)\\)\")"
+      "Bash(python -c \"import sys,json; data=json.load\\(sys.stdin\\); print\\(json.dumps\\([{'name':m['name'],'configId':m['configId']} for m in data.get\\('data',[]\\)], indent=2\\)\\)\")",
+      "Bash(findstr \":8080\")",
+      "Bash(findstr \"18440\")",
+      "Bash(findstr \":3000 :3001\")",
+      "Bash(taskkill *)",
+      "Bash(./mvnw package *)"
     ]
   },
   "outputStyle": "default",
-  "language": "Chinese"
+  "language": "chinese"
 }

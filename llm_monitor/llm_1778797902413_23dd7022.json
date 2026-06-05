@@ -1,0 +1,1194 @@
+{
+  "callId" : "llm_1778797902413_23dd7022",
+  "sessionId" : "session-1778797838130",
+  "model" : "MiniMax-M2.7",
+  "apiUrl" : "https://api.minimax.chat/v1/chat/completions",
+  "requestTime" : "2026-05-15T06:31:42.413",
+  "messages" : [ {
+    "role" : "system",
+    "content" : "你正在执行任务计划的一个步骤。请专注于完成当前步骤的任务，给出简洁的结果。可用工具格式为 server__tool_name。完成当前步骤后，直接给出结果，不要继续执行后续步骤。\n\n⚡ SKILLS 工作流提示：\n- 如果上一步调用了 load_skill 并返回了技能详情，根据详情中的 Instructions 和 Available Scripts 决定下一步\n- 执行技能脚本：使用 run_skill_script(skill_name, script_name, parameters)\n- 读取参考文档：使用 read_skill_resource(skill_name, resource_path)\n- 生成文档（Word/PDF/Excel）时，必须使用 run_skill_script，不要直接用 bash-sandbox 写文件"
+  }, {
+    "role" : "user",
+    "content" : "请执行以下步骤：\n\n步骤描述：搜索文件中的关键词（对抗伪装、目标检测、系统设计等），提取论文核心章节内容\n建议使用的工具：search_file\n\n之前的上下文信息：\nsystem: 当前时间：2026年05月15日 星期五 06:31:01\n\n你是SuperFriend智能助手，采用ReAct模式处理任务。\n\n## 📋 输出格式\n```\nThought: [分析需求]\nAction: [工具名]\nAction Input: {\"param\": \"value\"}\n```\n\n## ⚠️ 核心规则\n1. 优先使用 Skills（见下方列表），用 load_skill 加载详情\n2. 每次只调用一个工具\n3. 任务完成时 Action: finish\n\n## 🔧 工具调用示例\n```\n# 示例1: 生成Word文档\nThought: 用户需要生成Word文档，先加载技能\nAction: load_skill\nAction Input: {\"skill_name\": \"minimax-docx\"}\n\n# 示例2: 搜索网络信息\nThought: 需要获取最新的AI趋势信息\nAction: web_search\nAction Input: {\"query\": \"2026年AI发展趋势\"}\n\n# 示例3: 读取用户上传的文件\nThought: 用户提到之前上传的文件，需要读取内容\nAction: read_user_file\nAction Input: {\"file_id\": \"abc123\"}\n\n# 示例4: 执行Python脚本\nThought: 需要运行Python代码处理数据\nAction: bash-sandbox__execute\nAction Input: {\"command\": \"python analyze.py\"}\n\n# 示例5: 任务完成\nThought: 已完成用户任务，返回结果\nAction: finish\nAction Input: {\"response\": \"文档已生成并发送给您\"}\n```\n\n## 🚀 高效执行原则\n1. **避免重复**：不要重复调用相同参数的工具\n2. **快速失败**：工具调用失败后立即切换策略，不要反复尝试\n3. **知识优先**：对于常识性问题，直接回答而非调用工具\n4. **信息充足即止**：收集到足够信息后立即给出答案\n5. **跳过网络获取**：除非必须实时数据，否则使用内置知识\n\n## ⚠️ 错误处理\n1. 工具调用失败时，分析错误原因并调整参数重试\n2. 连续失败3次后，换一种方法或直接告知用户\n3. 遇到权限问题，向用户说明需要什么权限\n\n\n\n\n## 🎯 Skills (按需加载)\n使用 `load_skill(skill_name)` 获取详细指令、脚本路径和参考文档。优先检查 Skills 再使用 MCP 工具。\n调用流程：load_skill → read_skill_resource(可选) → run_skill_script\n\n**general**: canvas-design: Create beautiful visual art in .png and .pdf documents us...; doc-coauthoring: Guide users through a structured workflow for co-authorin...; skill-creator: Create new skills, modify and improve existing skills, an...; executing-plans: Use when you have a written implementation plan to execut...; algorithmic-art: Creating algorithmic art using p5.js with seeded randomne...; brand-guidelines: Applies Anthropic's official brand colors and typography ...; brainstorming: You MUST use this before any creative work - creating fea...; theme-factory: Toolkit for styling artifacts with a theme. These artifac...\n**document-generation**: minimax-pdf: Use this skill when visual quality and design identity ma...\n**productivity**: pptx-generator: Generate, edit, and read PowerPoint presentations. Create...; minimax-xlsx: Open, create, read, analyze, edit, or validate Excel/spre...\n**document-processing**: minimax-docx: Professional DOCX document creation, editing, and formatt...\n\n\n## 🔧 工具快速选择\n\n### ⚡ Skills 工作流（文档生成必用）\n当用户需要生成 Word/PDF/Excel 文档时，必须使用 Skills 工作流：\n```\n步骤1: load_skill(skill_name=\"minimax-docx\")  # 获取技能详情和脚本列表\n步骤2: run_skill_script(skill_name=\"minimax-docx\", script_name=\"scripts/create.py\", parameters={...})  # 执行脚本生成文档\n```\n⚠️ 重要：不要直接调用 bash-sandbox__execute 来执行技能脚本，必须使用 run_skill_script！\n(run_skill_script 内部会自动调用 bash-sandbox 并处理环境配置和文件发送)\n\n### 按场景选择\n| 用户需求 | 推荐工具 | 说明 |\n|----------|----------|------|\n| 生成Word/PDF/Excel | `load_skill` → `run_skill_script` | minimax-docx/pdf/xlsx |\n| 搜索网络信息 | `web_search` | 返回搜索结果和AI答案 |\n| 抓取网页内容 | `web_extract` | 自动处理反爬虫 |\n| 执行代码/命令 | `bash-sandbox__execute` | 沙箱环境执行 |\n| 读取用户文件 | `read_user_file` | 读取之前上传的文件 |\n| 发送文件给用户 | `send_file` | 将生成的文件发送 |\n| 设计/前端 | `load_skill` | canvas-design/frontend-design |\n|\n\n### 📦 沙箱环境说明\n沙箱是一个隔离的命令执行环境，用于安全地运行代码和脚本。\n\n**核心概念**：\n- **sessionId**: 会话标识，用于保持命令间的状态（环境变量、工作目录等）\n- **workingDirectory**: 当前工作目录，所有相对路径的文件操作都在此目录下进行\n- **自动会话管理**: 首次执行命令时自动创建会话，后续可复用 sessionId\n\n**环境变量**（执行脚本时自动注入）：\n- `$SKILL_DIR`: 当前技能的目录路径\n- `$SKILL_OUTPUT_DIR`: 建议的输出目录，生成的文件应放在此目录\n- `$SKILL_SESSION_ID`: 当前会话ID\n- `$SKILL_PARAM_*`: 用户传入的参数（如 `$SKILL_PARAM_title`）\n\n**最佳实践**：\n```\n# 1. 首次执行会返回 sessionId 和 workingDirectory\nbash-sandbox__execute(command=\"pwd\")  \n# 返回: sessionId='sess_xxx', workingDirectory='/path/to/workspace'\n\n# 2. 后续命令复用 sessionId 保持状态\nbash-sandbox__execute(sessionId=\"sess_xxx\", command=\"python script.py\")\n\n# 3. 生成文件时使用环境变量指定路径\nbash-sandbox__execute(command=\"python -c \\\"import os; print(os.environ.get('SKILL_OUTPUT_DIR'))\\\"\")\n\n# 4. 输出文件建议使用 $SKILL_OUTPUT_DIR 作为前缀\nbash-sandbox__execute(command=\"echo 'content' > $SKILL_OUTPUT_DIR/output.txt\")\n```\n\n**注意事项**：\n- Windows 环境优先使用 Git Bash，支持完整 bash 语法\n- 如无 Git Bash 则使用 PowerShell，语法有所不同\n- 危险命令（如 `rm -rf /`）会被阻止\n- 会话默认 30 分钟无活动后自动清理\n\n### 调用流程\n```\n# Skills 流程（文档生成推荐）\nload_skill(skill_name=\"minimax-docx\")  # 获取脚本路径\nrun_skill_script(skill_name=\"minimax-docx\", script_name=\"scripts/create.py\", parameters={...})  # 生成文档\n\n# 通用命令流程（非技能任务）\nbash-sandbox__execute(command=\"python script.py\")  # 执行命令\nbash-sandbox__export_file(sourcePath=\"output.pdf\")  # 导出到共享目录\nsend_file(file_path=\"共享目录/output.pdf\")  # 发送给用户\n```\n\n### 重要提示\n- **run_skill_script**: 用于执行技能脚本，自动处理环境配置和文件发送\n- **bash-sandbox__execute**: 用于通用命令，需手动导出和发送文件\n- **工具名格式**: MCP工具使用 `server__tool_name`（双下划线）\n\n\n【当前会话文件】\n会话中已有以下文件，你可以通过文件路径操作它们：\n\n1. 40be51f6-51d0-4c59-894b-473da71fbcae.docx (application/vnd.openxmlformats-officedocument.wordprocessingml.document), 大小: 1.6MB, 路径: temp://document/40be51f6-51d0-4c59-894b-473da71fbcae.docx\n\n提示：对已生成的文件，可使用 edit fill-placeholders 或 edit replace-text 追加内容，无需重新创建。\n\n【长文档生成策略】\n当需要生成超过 2000 字的文档时，必须分批进行：\n1. 第一步：使用 create 命令创建文档骨架（标题 + 目录结构）\n2. 第二步：使用 edit fill-placeholders 或 edit replace-text 逐章填充内容\n3. 每次填充一个章节（约 1000-2000 字），避免单次输出超出 token 限制\n4. 填充完成后，使...\nuser: \n\n【用户上传的文件】\n当前会话 ID: `session-1778797838130`\n\n用户上传了以下文件：\n\n- **40be51f6-51d0-4c59-894b-473da71fbcae.docx**\n  - 文件 ID: `6c5ea078`\n  - 类型: 代码\n  - 大小: 1.6 MB\n  - 摘要: === 文档内容 === 毕业设计（论文） 题 目：   面向目标检测模型的对抗伪装系统设计    学 院：     计算机学院      专 业：      软件工程      班 级：       二班        学 号：     04223058       学生姓名：      高兴伟        导师姓名： 张亚东 职称：       起止时间：  至     年 月 日 毕业设计...\n  - 行数: 374\n  - 状态: ✅ 已预解析，可直接读取\n\n**可用工具**：\n- `list_files`: 列出所有文件\n- `read_file`: 读取文件内容（可指定行号范围）\n- `search_file`: 在文件中搜索关键词\n- `get_file_info`: 获取文件详细信息\n- `get_file_path`: 获取文件的本地绝对路径（传给 run_skill_script 时必须使用）\n\n⚠️ **重要**：调用 `read_file`、`get_file_info`、`search_file`、`get_file_path` 工具时，必须传入 `session_id` 参数：`session-1778797838130`\n\n📋 **何时应该主动读取文件**：\n1. 用户要求分析、总结、解释文件内容时\n2. 用户的问题需要参考文件内容才能回答时\n3. 用户上传文件后说\"帮我看看\"、\"分析一下\"等模糊请求时\n4. 用户要求提取文件中的特定信息时\n\n💡 **建议**：\n- 如果用户没有明确要求处理文件，先询问用户是否需要分析文件\n- 读取文件前，先用 `get_file_info` 了解文件详情\n- 对于大文件，可以分段读取（使用 start_line 和 end_line 参数）\n\n🔧 **使用 Skill 处理文件时的步骤**：\n1. 先用 `get_file_path` 获取文件的本地绝对路径\n2. 将获取到的本地路径作为 `run_skill_script` 的 `input` 参数传入\n3. 例如：`get_file_path(file_id=\"xxx\")` -> 得到路径 -> `run_skill_script(skill_name=\"minimax-docx\", parameters={\"input\": \"获取到的路径\", \"output\": \"output.docx\"})`\n\nassistant: [步骤1完成] <think>用户要求获取上传文件 40be51f6-51d0-4c59-894b-473da71fbcae.docx 的本地绝对路径。\n\n根据提示，应该使用 get_file_path 工具，并且需要传入 session_id 参数。\n\n文件ID是 6c5ea078（从上下文中的文件信息可以找到）\n会话ID是 session-1778797838130\n\n让我调用 get_file_path 工具。</think>\n\n\n\n[get_file_path 结果]: ## 文件路径\n\n- **文件名**: 40be51f6-51d0-4c59-894b-473da71fbcae.docx\n- **本地绝对路径**: `C:\\Users\\iherefor\\Desktop\\project\\SuperFriend\\uploads\\temp\\document\\40be51f6-51d0-4c59-894b-473da71fbcae.docx`\n\n请将此路径作为 `run_skill_script` 的 `input` 参数使用。\n<think>成功获取了文件的本地绝对路径。根据步骤描述，用户需要这个路径，我应该将结果返回给用户。</think>\n\n✅ **文件路径获取成功**\n\n| 属性 | 值 |\n|------|-----|\n| 文件ID | `6c5ea078` |\n| 文件名 | 40be51f6-51d0-4c59-894b-473da71fbcae.docx |\n| **本地绝对路径** | `C:\\Users\\iherefor\\Desktop\\project\\SuperFriend\\uploads\\temp\\document\\40be51f6-51d0-4c59-894b-473da71fbcae.docx` |\n\n此路径可直接用于 `run_skill_script` 的 `input` 参数。\nassistant: [步骤2完成] <think>用户要求读取docx文件内容，解析论文标题、学院、专业、学生信息、指导老师等元数据。根据文件信息，已经知道文件的本地路径是：`C:\\Users\\iherefor\\Desktop\\project\\SuperFriend\\uploads\\temp\\document\\40be51f6-51d0-4c59-894b-473da71fbcae.docx`\n\n用户上传的文件已预解析可以直接读取，需要使用 read_file 工具来读取文件内容。用户要求解析元数据，所以我需要读取文件并分析其中的内容。\n\n根据文件摘要，内容包含：\n- 题目：面向目标检测模型的对抗伪装系统设计\n- 学院：计算机学院\n- 专业：软件工程\n- 班级：二班\n- 学号：04223058\n- 学生姓名：高兴伟\n- 导师姓名：张亚东\n- 职称：（未显示）\n\n但是要完整解析所有元数据，我应该使用 read_file 工具读取文件内容。文件ID是 `6c5ea078`，session_id 是 `session-1778797838130`。\n\n让我调用 read_file 来读取这个 docx 文件的内容。\n</think>\n\n[步骤2进行中] \n\n我正在读取用户上传的docx文件内容，解析其中的元数据信息。\n\n[read_file 结果]: ## 文件内容: 40be51f6-51d0-4c59-894b-473da71fbcae.docx\n\n```\n=== 文档内容 ===\n  毕业设计（论文）\n题    目：   面向目标检测模型的对抗伪装系统设计   \n学    院：     计算机学院     \n专    业：      软件工程       \n班    级：       二班       \n学    号：     04223058       \n学生姓名：        高兴伟       \n导师姓名： 张亚东    职称：       \n起止时间：            至             \n 年     月     日\n\n毕业设计（论文）承诺书\n本人所提交的毕业设计（论文）《面向深度学习模型的鲁棒性测评系统设计与实现》是本人在指导教师指导下独立研究、写作的成果，毕业设计（论文）中所引用他人的文献、数据、图件、资料均已明确标注；对本文的研究做出重要贡献的个人和集体，均已在文中以明确方式注明并表示感谢。\n本人深知本承诺书的法律责任，违规后果由本人承担。\n论文作者签名：                                                                日       期：              \n关于毕业设计（论文）使用授权的声明\n本人在导师指导下所完成的论文及相关的职务作品，知识产权归属西安邮电大学。本人完全了解西安邮电大学有关保存、使用毕业设计（论文）的规定，同意学校保存或向国家有关部门或机构送交论文的纸质版和电子版，允许论文被查阅和借阅；本人授权西安邮电大学可以将本毕业设计（论文）的全部或部分内容编入有关数据库进行检索，可以采用任何复制手段保存和汇编本毕业设计（论文）。本人离校后发表、使用毕业设计（论文）或与该毕业设计（论文）直接相关的学术论文或成果时，第一署名单位仍然为西安邮电大学。\n本毕业设计（论文）研究内容：\n□可以公开\n□不宜公开，已办理保密申请，解密后适用本授权书。\n（请在以上选项内选择其中一项打“√”）\n论文作者签名：                                                              导师签名：         \n日                 期：                                                               日         期：           \n摘    要\n随着深度学习技术的快速发展，目标检测模型在自动驾驶、智能监控、机器人视觉等领域得到了广泛应用。然而，研究表明深度神经网络容易受到对抗样本的攻击，这给目标检测系统的安全性带来了严重挑战。为了揭示目标检测模型的脆弱性并推动鲁棒性研究，本文设计并实现了一个面向目标检测模型的对抗伪装系统。\n本系统基于Flask框架构建Web应用，采用Jinja2模板引擎实现服务端渲染界面，使用JSON文件进行数据持久化存储。系统实现了超过20种对抗攻击算法，涵盖FGSM、PGD、CW等经典数字域攻击方法，AdvCam、ShadowAttack等物理域攻击方法，以及基于EoT框架的多种补丁攻击方法。其中，AdvCam通过模拟相机镜头扰动实现攻击效果；ShadowAttack通过优化阴影纹理实现物理世界攻击；补丁攻击支持EoT优化补丁、RP2风格补丁、DAPatch可变形补丁等多种方式。\n在系统设计上，本系统采用三层架构（Blueprint路由层、Processor业务逻辑层、Utils工具层），使用Model Manager单例模式配合LRU缓存策略统一管理模型实例，采用懒加载策略优化内存占用，实现了动态配置刷新机制。系统还集成了YOLO模型训练功能，支持数据集上传、自动标注和异步训练。\n通过实验验证，本系统能够有效地生成对抗样本，成功欺骗目标检测模型，同时具备良好的用户交互体验和扩展性。系统的实现对于研究深度学习模型安全性、提升目标检测系统的鲁棒性具有重要的理论和实践价值。\n关键词：目标检测；对抗攻击；对抗样本；深度学习安全；YOLOv8\nABSTRACT\nWith the rapid development of deep learning technology, object detection models have been widely applied in autonomous driving, intelligent surveillance, robot vision and other fields. However, research has shown that deep neural networks are vulnerable to adversarial examples, which poses serious challenges to the security of object detection systems. To reveal the vulnerabilities of object detection models and promote robustness research, this thesis designs and implements an adversarial camouflage system for object detection models.\nThe system is built on the Flask framework as a Web application, using the Jinja2 template engine for server-side rendering and JSON files for data persistence. The system implements more than 20 adversarial attack algorithms, covering classical digital-domain methods such as FGSM, PGD, CW, physical-domain methods including AdvCam and ShadowAttack, as well as various patch-based attacks based on the EoT framework. AdvCam achieves attack effects by simulating camera lens perturbations; ShadowAttack implements physical world attacks through optimized shadow textures; patch attacks support EoT-optimized patches, RP2-style patches, DAPatch deformable patches, and other methods.\nIn system design, this system adopts a three-layer architecture (Blueprint routing layer, Processor business logic layer, Utils utility layer), uses the Model Manager singleton pattern with LRU caching strategy to uniformly manage model instances, employs lazy loading strategy to optimize memory usage, and implements dynamic configuration refresh mechanism. The system also integrates YOLO model training functionality, supporting dataset upload, auto-annotation, and asynchronous training.\nThrough experimental verification, this system can effectively generate adversarial examples to successfully deceive object detection models, while providing good user interaction experience and extensibility. The implementation of this system has important theoretical and practical value for studying deep learning model security and improving the robustness of object detection systems.\nKey words : Deep Learning; Robustness Evaluation; Confronting Attacks; System Design; Model Security\n\n目    录\n摘    要\tI\nABSTRACT\tII\n第1章  绪    论\t1\n1.1  研究背景及意义\t1\n1.2  研究目的\t2\n1.3  国内外研究现状\t3\n1.3.1  国外研究现状\t3\n1.3.2  国内研究现状\t5\n1.4  研究内容\t6\n第2章  相关技术与理论基础\t7\n2.1深度学习模型基础理论\t7\n2.2  主流目标检测算法\t8\n2.3  对抗样本与对抗攻击\t11\n2.3.1 对抗样本的定义与特性\t11\n2.3.2 对抗攻击的分类\t11\n第3章  系统需求分析与设计\t14\n3.1  系统需求分析\t15\n3.1.1  功能需求分析\t15\n3.1.2  非功能需求分析\t15\n3.2  系统总体架构设计\t16\n3.2.1  系统架构设计\t16\n3.2.2  技术选型分析\t17\n3.3  系统功能模块设计\t17\n3.3.1  图像管理与历史记录模块\t17\n3.3.2  模型管理模块\t18\n3.3.3  目标检测模块\t18\n3.3.4  对抗攻击模块\t18\n3.4  数据存储设计\t...\n\n请执行此步骤并返回结果。如果需要调用工具，请调用工具。如果不需要工具，直接给出结果。"
+  }, {
+    "role" : "assistant",
+    "tool_calls" : [ {
+      "function" : {
+        "name" : "read_file",
+        "arguments" : "{\"end_line\":200,\"file_id\":\"6c5ea078\",\"session_id\":\"session-1778797838130\",\"start_line\":1}"
+      },
+      "id" : "call_function_mj4wiaep9xfn_1",
+      "type" : "function"
+    } ],
+    "content" : "<think>用户要求我执行一个任务：搜索文件中的关键词（对抗伪装、目标检测、系统设计等），提取论文核心章节内容。用户之前已经上传了一个docx文件，我已经获取了文件路径并读取了部分内容。\n\n从已读取的内容来看，文件包含：\n1. 论文标题：面向目标检测模型的对抗伪装系统设计\n2. 学生信息：高兴伟，学号04223058\n3. 导师：张亚东\n4. 学院：计算机学院，专业：软件工程\n5. 摘要部分包含了主要研究内容和关键词\n6. 目录显示了章节结构\n\n但是内容被截断了，我需要继续读取文件的剩余部分来获取完整的核心章节内容。用户要求\"提取论文核心章节内容\"，我需要读取完整的文档内容来进行分析。\n\n由于文件已经预解析，我可以使用 read_file 工具继续读取文件。但是根据之前的调用结果，文件内容似乎很长，可能需要分段读取。\n\n让我继续读取文件，从end_line参数可以看出前面的内容已经读到了目录部分，我需要继续读取剩余内容。\n</think>\n\n[步骤3进行中] \n\n我已经获取了论文的核心元数据和部分内容摘要。根据步骤要求，我需要继续搜索文件中的关键词并提取核心章节内容。让我继续读取完整的文档内容：\n"
+  }, {
+    "role" : "tool",
+    "tool_call_id" : "call_function_mj4wiaep9xfn_1",
+    "name" : "read_file",
+    "content" : "## 文件内容: 40be51f6-51d0-4c59-894b-473da71fbcae.docx\n\n**读取范围**: 行 1 - 200\n\n```\n=== 文档内容 ===\n  毕业设计（论文）\n题    目：   面向目标检测模型的对抗伪装系统设计   \n学    院：     计算机学院     \n专    业：      软件工程       \n班    级：       二班       \n学    号：     04223058       \n学生姓名：        高兴伟       \n导师姓名： 张亚东    职称：       \n起止时间：            至             \n 年     月     日\n\n毕业设计（论文）承诺书\n本人所提交的毕业设计（论文）《面向深度学习模型的鲁棒性测评系统设计与实现》是本人在指导教师指导下独立研究、写作的成果，毕业设计（论文）中所引用他人的文献、数据、图件、资料均已明确标注；对本文的研究做出重要贡献的个人和集体，均已在文中以明确方式注明并表示感谢。\n本人深知本承诺书的法律责任，违规后果由本人承担。\n论文作者签名：                                                                日       期：              \n关于毕业设计（论文）使用授权的声明\n本人在导师指导下所完成的论文及相关的职务作品，知识产权归属西安邮电大学。本人完全了解西安邮电大学有关保存、使用毕业设计（论文）的规定，同意学校保存或向国家有关部门或机构送交论文的纸质版和电子版，允许论文被查阅和借阅；本人授权西安邮电大学可以将本毕业设计（论文）的全部或部分内容编入有关数据库进行检索，可以采用任何复制手段保存和汇编本毕业设计（论文）。本人离校后发表、使用毕业设计（论文）或与该毕业设计（论文）直接相关的学术论文或成果时，第一署名单位仍然为西安邮电大学。\n本毕业设计（论文）研究内容：\n□可以公开\n□不宜公开，已办理保密申请，解密后适用本授权书。\n（请在以上选项内选择其中一项打“√”）\n论文作者签名：                                                              导师签名：         \n日                 期：                                                               日         期：           \n摘    要\n随着深度学习技术的快速发展，目标检测模型在自动驾驶、智能监控、机器人视觉等领域得到了广泛应用。然而，研究表明深度神经网络容易受到对抗样本的攻击，这给目标检测系统的安全性带来了严重挑战。为了揭示目标检测模型的脆弱性并推动鲁棒性研究，本文设计并实现了一个面向目标检测模型的对抗伪装系统。\n本系统基于Flask框架构建Web应用，采用Jinja2模板引擎实现服务端渲染界面，使用JSON文件进行数据持久化存储。系统实现了超过20种对抗攻击算法，涵盖FGSM、PGD、CW等经典数字域攻击方法，AdvCam、ShadowAttack等物理域攻击方法，以及基于EoT框架的多种补丁攻击方法。其中，AdvCam通过模拟相机镜头扰动实现攻击效果；ShadowAttack通过优化阴影纹理实现物理世界攻击；补丁攻击支持EoT优化补丁、RP2风格补丁、DAPatch可变形补丁等多种方式。\n在系统设计上，本系统采用三层架构（Blueprint路由层、Processor业务逻辑层、Utils工具层），使用Model Manager单例模式配合LRU缓存策略统一管理模型实例，采用懒加载策略优化内存占用，实现了动态配置刷新机制。系统还集成了YOLO模型训练功能，支持数据集上传、自动标注和异步训练。\n通过实验验证，本系统能够有效地生成对抗样本，成功欺骗目标检测模型，同时具备良好的用户交互体验和扩展性。系统的实现对于研究深度学习模型安全性、提升目标检测系统的鲁棒性具有重要的理论和实践价值。\n关键词：目标检测；对抗攻击；对抗样本；深度学习安全；YOLOv8\nABSTRACT\nWith the rapid development of deep learning technology, object detection models have been widely applied in autonomous driving, intelligent surveillance, robot vision and other fields. However, research has shown that deep neural networks are vulnerable to adversarial examples, which poses serious challenges to the security of object detection systems. To reveal the vulnerabilities of object detection models and promote robustness research, this thesis designs and implements an adversarial camouflage system for object detection models.\nThe system is built on the Flask framework as a Web application, using the Jinja2 template engine for server-side rendering and JSON files for data persistence. The system implements more than 20 adversarial attack algorithms, covering classical digital-domain methods such as FGSM, PGD, CW, physical-domain methods including AdvCam and ShadowAttack, as well as various patch-based attacks based on the EoT framework. AdvCam achieves attack effects by simulating camera lens perturbations; ShadowAttack implements physical world attacks through optimized shadow textures; patch attacks support EoT-optimized patches, RP2-style patches, DAPatch deformable patches, and other methods.\nIn system design, this system adopts a three-layer architecture (Blueprint routing layer, Processor business logic layer, Utils utility layer), uses the Model Manager singleton pattern with LRU caching strategy to uniformly manage model instances, employs lazy loading strategy to optimize memory usage, and implements dynamic configuration refresh mechanism. The system also integrates YOLO model training functionality, supporting dataset upload, auto-annotation, and asynchronous training.\nThrough experimental verification, this system can effectively generate adversarial examples to successfully deceive object detection models, while providing good user interaction experience and extensibility. The implementation of this system has important theoretical and practical value for studying deep learning model security and improving the robustness of object detection systems.\nKey words : Deep Learning; Robustness Evaluation; Confronting Attacks; System Design; Model Security\n\n目    录\n摘    要\tI\nABSTRACT\tII\n第1章  绪    论\t1\n1.1  研究背景及意义\t1\n1.2  研究目的\t2\n1.3  国内外研究现状\t3\n1.3.1  国外研究现状\t3\n1.3.2  国内研究现状\t5\n1.4  研究内容\t6\n第2章  相关技术与理论基础\t7\n2.1深度学习模型基础理论\t7\n2.2  主流目标检测算法\t8\n2.3  对抗样本与对抗攻击\t11\n2.3.1 对抗样本的定义与特性\t11\n2.3.2 对抗攻击的分类\t11\n第3章  系统需求分析与设计\t14\n3.1  系统需求分析\t15\n3.1.1  功能需求分析\t15\n3.1.2  非功能需求分析\t15\n3.2  系统总体架构设计\t16\n3.2.1  系统架构设计\t16\n3.2.2  技术选型分析\t17\n3.3  系统功能模块设计\t17\n3.3.1  图像管理与历史记录模块\t17\n3.3.2  模型管理模块\t18\n3.3.3  目标检测模块\t18\n3.3.4  对抗攻击模块\t18\n3.4  数据存储设计\t19\n第4章  面向目标检测模型的对抗伪装系统的实现\t19\n4.1  开发环境搭建与配置\t19\n4.1.1  硬件环境配置\t19\n4.1.2  软件环境配置\t20\n4.2  系统架构实现\t21\n4.2.1  Flask应用与前端实现\t21\n4.2.2  后端Flask实现\t21\n4.3  核心功能实现\t21\n4.3.1  Model Manager单例模式\t22\n4.3.2  对抗攻击算法实现\t22\n4.3.3  性能优化策略\t23\n4.4  系统界面与可视化实现\t24\n4.4.1  前端界面开发\t24\n4.4.2  后端接口开发\t27\n4.5  系统集成与测试\t28\n4.5.1  功能测试\t28\n4.5.2  性能测试\t32\n4.5.3  系统优化\t33\n第5章  结    论\t35\n5.1  研究工作总结\t35\n5.2  创新点\t35\n参考文献\t37\n致    谢\t39\n附    录\t40\n第1章  绪    论\n1.1  研究背景及意义\n随着人工智能技术的飞速发展，深度学习在计算机视觉领域取得了突破性进展。目标检测作为计算机视觉的核心任务之一，能够从图像或视频中同时识别和定位感兴趣的目标对象，广泛应用于自动驾驶、智能监控、医学影像分析、机器人视觉、无人机巡检等场景。近年来，以YO...[截断，完整内容请查看日志]"
+  }, {
+    "role" : "assistant",
+    "tool_calls" : [ {
+      "function" : {
+        "name" : "read_file",
+        "arguments" : "{\"end_line\":374,\"file_id\":\"6c5ea078\",\"session_id\":\"session-1778797838130\",\"start_line\":200}"
+      },
+      "id" : "call_function_fd2xkr2m16f4_1",
+      "type" : "function"
+    } ],
+    "content" : "<think>The user has provided context about a graduation thesis document and wants me to search for keywords like \"对抗伪装\" (adversarial camouflage), \"目标检测\" (object detection), \"系统设计\" (system design), etc. \n\nLooking at the context, I can see:\n1. The document has already been read and partially parsed (shown in lines 1-200)\n2. The document is a graduation thesis titled \"面向目标检测模型的对抗伪装系统设计\" (Design of an Adversarial Camouflage System for Object Detection Models)\n3. The document contains structured content including abstracts, table of contents, and chapters\n\nGiven the user wants me to \"搜索文件中的关键词（对抗伪装、目标检测、系统设计等），提取论文核心章节内容\" (Search for keywords in the file (adversarial camouflage, object detection, system design, etc.), extract core chapter content from the thesis), and I need to continue reading the file to extract the core chapter content.\n\nLooking at the read_file result, I can see:\n- Title, author, supervisor metadata\n- Chinese and English abstracts\n- Table of contents with chapters 1-5 and references\n\nI should continue reading the file to get the actual chapter content. The table of contents shows:\n- Chapter 1: Introduction (绪论)\n- Chapter 2: Related Technologies and Theoretical Foundation (相关技术与理论基础)\n- Chapter 3: System Requirements Analysis and Design (系统需求分析与设计)\n- Chapter 4: Implementation of the Adversarial Camouflage System for Object Detection Models (面向目标检测模型的对抗伪装系统的实现)\n- Chapter 5: Conclusion (结论)\n\nSince the user wants to \"提取论文核心章节内容\" (extract core chapter content), I should read more of the document to get the actual content of these chapters. Let me continue reading from where we left off (line 200 onwards).\n\nI'll use the sequentialthinking tool to organize my approach and then read more of the file.\n</think>\n\n\n"
+  }, {
+    "role" : "tool",
+    "tool_call_id" : "call_function_fd2xkr2m16f4_1",
+    "name" : "read_file",
+    "content" : "## 文件内容: 40be51f6-51d0-4c59-894b-473da71fbcae.docx\n\n**读取范围**: 行 200 - 374\n\n```\n系统实现了多层次、多类型的对抗攻击算法，由 AdversarialAttackProcessor 与 AdvCamShadowProcessor两个处理器类封装数字域与物理域攻击，统一通过 generate_adversarial_example()接口分发至对应处理器执行。\n数字域攻击涵盖九种核心算法：FGSM（Fast Gradient Sign Method）通过计算交叉熵损失函数相对于输入图像的梯度，沿梯度符号方向以固定步长 ε 添加扰动来生成对抗样本， FGSM++ 作为增强变体，采用多步迭代策略，通过将扰动分解为多个小步长累积更新来增强攻击效果；Targeted FGSM有别于标准 FGSM 的非目标攻击模式，将扰动方向设为最小化指定目标类别的预测概率而非最大化原类别损失；Universal FGSM通过对多张图像迭代累积梯度来更新通用扰动向量，使同一扰动可无差别地应用于不同输入图像并产生误分类效果，从而具备跨图像的迁移攻击能力；PGD（Projected Gradient Descent）在 FGSM 基础上引入多步迭代机制，每次迭代计算梯度并沿符号方向更新，然后将扰动投影回 ε 约束球内，重复指定次数直至收敛；Momentum PGD 在标准 PGD 的梯度更新中引入动量项累积历史梯度方向，以帮助逃离局部最优并增强跨模型迁移性；PGD-Linf 与 PGD-L2 分别针对 L∞ 范数和 L2范数设计差异化的投影策略，前者将扰动裁剪至 [-ε,ε] 区间，后者将扰动向量投影到以 ε 为半径的 L2 球面上；CW（C Carlini & Wagner）攻击采用更精细的优化框架，通过 tanh 变换确保扰动输出在 [0,1] 范围内，以 Adam优化器配合学习率调度，并通过对偶变量二分查找确定最优扰动权重系数 c，损失函数设计为 L2距离与对抗损失项的加权和，实现高效率、低可视性的对抗样本生成。\n  物理域攻击模拟真实世界光学效应与环境因素：AdvCam 攻击通过色差效应模拟镜头对不同波长光线的折射差异（红通道右移、蓝通道左移），结合镜头晕影导致的边缘亮度衰减、轻微高斯模糊模拟失焦，以及传感器噪声叠加来模拟真实相机成像过程；AdvShadow攻击利用差分进化算法（differential evolution）优化阴影遮罩参数，以中心坐标和强度为优化变量，以扰动幅度最小化为目标函数，生成具有软边缘、自然过渡的物理阴影遮罩，模拟多光源环境的空间遮挡效果；combined 攻击将 AdvCam 与 AdvShadow串联执行，先应用相机扰动再施加阴影效果以增强物理对抗性。\n此外，系统集成了 CVPR 2022发表的 ShadowAttack 官方实现与 CVPR 2020 的AdvCam 官方实现，其中 ShadowAttack支持快速模式（预设参数）与优化模式（差分进化搜索）切换，AdvCam 提供 natural、rusty、dirty、generic四种伪装风格，并通过关键区域检测（融合目标检测、显著性检测与边缘检测）实现智能定位。\nEffectivePatchAttack 类实现了基于真实模型梯度优化的补丁攻击机制，支持多补丁随机生成策略：首先通过 YOLO目标检测定位图像中的显著目标区域，随机选择1至5个目标作为补丁贴附位置，补丁大小为目标框的50%-80%比例，位置在目标框内随机采样；优化过程以原始类别预测概率降低为目标，联合优化所有补丁区域的像素值，通过 Adam 梯度下降配合 MSE正则化约束补丁自然度，每20步验证一次攻击效果并保存最优结果，最终生成可贴在物理表面的人脸对抗补丁；该类还支持针对 YOLO检测器的定向攻击，通过最小化检测框数量与平均置信度的加权和来优化补丁，使目标检测器产生漏检效果。\n4.3.3  性能优化策略\n本为了提升系统的处理效率，系统采用了以下优化策略：\n（1）LRU模型缓存：Model Manager采用LRU缓存策略，最多缓存5个模型实例。缓存命中时直接返回已加载模型，避免重复加载开销；缓存满时自动淘汰最早未使用的模型，释放GPU内存。\n（2）线程安全训练：模型训练采用training_lock互斥锁配合daemon线程实现异步执行，训练在后台线程中运行，不阻塞Web请求处理。\n（3）延迟加载：EffectivePatchAttack延迟加载YOLO模型，仅在首次执行攻击时才初始化检测器，减少系统启动时的内存占用。\n（4）GPU加速推理：利用CUDA并行计算能力加速PyTorch模型推理，YOLO模型和分类模型的推理均在GPU上执行。\n4.4  系统界面与可视化实现\n4.4.1  前端界面开发\n系统前端基于 Flask 模板引擎构建，采用 Bootstrap 5响应式布局配合 glassmorphism玻璃态设计主题，整体视觉风格统一、层次分明。系统共包含五大功能页面：首页、目标检测、伪装对抗、模型管理、模型训练，各页面均继承统一的基础模板（base.html）以保证导航与样式的一致性。\n首页如图4.1所示，采用卡片式布局，横向排列三大功能入口模块——目标检测、伪装对抗、模型训练，每个功能卡片包含图标、标题、描述与可用模型标签，用户点击即可跳转至对应功能页面，底部标注项目学习属性声明。\n图4.1  系统首页\n目标检测页面如图4.2所示，提供图片上传与检测结果展示两大功能区域，文件上传支持点击选择与拖拽两种方式，图片预览在上传成功后即时显示；模型选择以下拉框形式呈现可用 YOLO 系列模型；检测完成后页面展示统计卡片（检测目标数、平均置信度、使用模型、最高置信度），并以双栏对比形式呈现原图与检测结果，同时以表格形式列出所有检测到的目标类别、置信度分数与边界框坐标。\n图4.2  目标检测页面\n伪装对抗页面如图4.3所示，为系统核心功能模块，采用分步式交互设计：第一步通过卡片列表选择攻击类型（有效补丁攻击、阴影攻击、FGSM、PGD、相机扰动），被选中卡片以绿色边框高亮标记；第二步根据选择的攻击类型动态显示对应参数配置区域，包含模型选择、滑块式数值调节（补丁大小、优化步数、攻击强度等）；第三步上传图片并提交生成。攻击完成后页面展示原始图像与对抗样本双栏对比，当攻击类型为有效补丁时额外显示补丁详细信息卡片（目标类别、补丁大小、位置坐标、覆盖比例），并提供检测对比功能按键，用户选择检测模型后可查看原始样本与对抗样本的检测结果差异统计（平均置信度变化、匹配目标数、丢失目标数、新增目标数、类别变化详情）。\n图4.3  伪装对抗页面\n模型管理页面如图4.4所示，以列表形式展示已训练模型，包含模型名称、文件大小、文件名等信息，提供刷新列表、导出模型、删除模型三项操作入口，其中删除操作通过模态框进行二次确认以防止误操作，页面顶部显示训练模型数量与总占用空间统计。\n图4.4  模型管理页面\n模型训练页面如图4.5所示，包含基础模型选择、数据集上传、训练参数配置三大区块，数据集支持 ZIP压缩包上传并附带数据格式说明指南，训练参数涵盖轮数、批次大小、图像尺寸、早停耐心值、设备选择、优化器类型、学习率、权重衰减、预热轮数、冻结层配置等十余项可选参数，页面实时检测 CUDA 环境并根据GPU可用性动态启用或禁用 GPU设备选项，训练过程中通过进度条与状态文字展示当前阶段与完成百分比，训练完成后展示统计摘要（完成轮数、训练时长）与新模型名称。\n图4.5  模型训练页面\n4.4.2  后端接口开发\n后端采用 Flask 框架构建，以应用工厂模式（create_app()）初始化整个系统。应用创建过程中完成以下核心配置：加载 Config配置类、启用 CSRF 保护（flask_wtf.CSRFProtect）、执行模型配置初始化函数 init_models_config()扫描可用的检测与对抗模型、创建上传与结果目录、注册五大功能蓝图，并注入模板上下文处理器以向模板提供模型列表函数。\n系统后端按功能划分为五个 Blueprint 模块，各模块通过 RESTful风格的路由提供接口服务。检测模块（detection_bp）提供图片上传端点（POST /detection/），接收文件与模型名称参数，完成安全验证后调用 process_detection()执行YOLO推理，返回检测结果图片路径与目标列表。对抗攻击模块（adversarial_bp）提供攻击生成端点（POST /adversarial/），根据攻击类型参数分发至对应处理器（FGSM/PGD/Shadow/CAM/Effective Patch 等），并额外提供检测对比端点（POST /adversarial/detect_compare），通过 IoU匹配算法分析原始样本与对抗样本的目标检测差异，返回详细对比指标。训练模块（training_bp）提供数据集上传（POST /training/upload_dataset）、CUDA 环境检测（GET /training/check_cuda）、同步训练（POST /training/train）、异步训练（POST /training/train_async）及状态查询（GET /training/status）等接口，支持 Epochs 大于10时自动切换为后台线程异步执行以避免请求超时。模型管理模块（model_management_bp）提供模型列表（GET /model-management/）、删除（POST /model-management/delete/<name>）、刷新（GET /model-management/refresh）及导出（GET /model-management/export/<name>）等接口，仅允许删除包含\"trained\"关键词的模型文件以防止误删预训练模型。历史记录模块（history_bp）提供记录查询（GET /history/）、删除（POST /history/delete/<id>）、统计（GET /history/api/stats）及清空（POST /history/clear）等接口，支持按操作类型过滤与分页查询。\n核心业务逻辑封装于独立处理器层（core/processors/），与蓝图路由解耦以保证可测试性与可维护性。ModelManager单例类负责模型加载与缓存管理，内部维护最多5个模型的 LRU缓存，所有操作通过线程锁保护以确保并发安全，支持动态刷新模型配置以实现模型热更新。HistoryManager 单例类通过 JSON文件持久化操作记录，每次写入操作先加载全部记录、追加新记录后再完整回写，确保历史数据的完整性；删除操作采用级联机制，同步清理上传目录、结果目录及关联的中间图片文件，并通过时间窗口与文件名匹配策略智能清理相关结果文件。\n4.5  系统集成与测试\n4.5.1  功能测试\n系统功能测试采用黑盒测试方法，针对各个核心功能模块设计测试用例并进行全面的功能性验证，确保系统能够按照需求规格说明书的预期正常运行。\n测试范围覆盖了图像上传与管理功能测试、目标检测功能测试、对抗攻击功能测试、模型管理功能测试、历史记录功能测试和模型训练功能测试等核心功能模块，具体测试内容及结果如表3所示。\n表 3  系统功能测试用例及结果\n本节对系统六大功能模块进行了全面测试，共计执行测试用例30余项，覆盖正常流程与异常边界情况。测试结果表明：图像上传功能正确实现安全文件处理与多种上传交互方式；目标检测功能正确调用YOLOv8 模型完成推理与结果绘制；对抗攻击功能覆盖数字域、物理域、补丁攻击三大类别共十余种算法，均能正常执行并生成有效对抗样本；模型管理功能实现动态模型发现与线程安全的 LRU缓存机制；历史记录功能正确持久化操作轨迹并提供完整的查询与删除能力；模型训练功能...[截断，完整内容请查看日志]"
+  } ],
+  "tools" : [ {
+    "function" : {
+      "name" : "load_skill",
+      "description" : "Load the full SKILL.md body with detailed instructions for a specific skill. 使用场景：当系统提示词中的 Skills 列表有匹配的技能时调用。 返回内容：技能描述、环境状态、可用脚本列表、参考文件列表、详细指令。 ⚡ CRITICAL: After calling load_skill, you MUST imme...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "skill_name" : {
+            "description" : "The name of the skill to load (e.g., 'minimax-docx')",
+            "type" : "string"
+          }
+        },
+        "required" : [ "skill_name" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "run_skill_script",
+      "description" : "⚡ CRITICAL: Execute a skill script to perform the actual task. This is the SECOND step after load_skill. You MUST call this tool after loading a skill to generate files or perform actions. DO NOT d...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "skill_name" : {
+            "description" : "技能名称，与 load_skill 使用相同值 (e.g., 'minimax-docx')",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID (可选，自动填充)",
+            "type" : "string"
+          },
+          "script_name" : {
+            "description" : "脚本路径，使用 load_skill 返回的 Available Scripts 中的格式。 格式: 'scripts/xxx.py' 或 'scripts/xxx.sh'。 示例: 'scripts/fill_write.py' (来自 load_skill 返回的 Available Scripts 列表)",
+            "type" : "string"
+          },
+          "parameters" : {
+            "description" : "传递给脚本的参数，会以 JSON 文件形式传递。 脚本通过 --param-file 参数接收。 示例: {\"input\": \"form.pdf\", \"output\": \"result.pdf\"}",
+            "type" : "object"
+          }
+        },
+        "required" : [ "skill_name", "script_name" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "read_skill_resource",
+      "description" : "Read supplementary files from a skill (reference docs, templates, examples). 使用场景：当 SKILL.md 引用 'references/' 或 'assets/' 目录下的文件时调用。 常见路径示例：'references/design-system.md', 'references/scenario_a_cre...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "skill_name" : {
+            "description" : "The name of the skill",
+            "type" : "string"
+          },
+          "resource_path" : {
+            "description" : "The path to the resource file (e.g., 'references/example.md')",
+            "type" : "string"
+          }
+        },
+        "required" : [ "skill_name", "resource_path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "setup_skill_environment",
+      "description" : "Setup and verify the environment for a skill. This checks if required dependencies (dotnet, python packages, etc.) are installed and installs them if missing. CRITICAL: Call this BEFORE attempting ...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "skill_name" : {
+            "description" : "The name of the skill to setup environment for (e.g., 'minimax-docx')",
+            "type" : "string"
+          }
+        },
+        "required" : [ "skill_name" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "send_file",
+      "description" : "发送文件给用户。用于将沙箱中生成的文件（如图片、PDF、文档）发送给前端显示。使用场景：bash-sandbox 执行命令生成文件后，调用此工具发送文件。注意：文件路径必须是共享目录中的绝对路径，或使用 bash-sandbox__export_file 导出后的路径。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "file_path" : {
+            "description" : "文件路径（共享目录中的绝对路径）",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID（可选）",
+            "type" : "string"
+          }
+        },
+        "required" : [ "file_path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "web_extract",
+      "description" : "【首选网页抓取工具】从URL提取网页内容。比 fetch/puppeteer 更强大：自动处理反爬虫、JS渲染、验证码，返回干净文本。支持单个url或批量urls。当需要获取网页内容时，请优先使用此工具而非 fetch。【重要】支持并行抓取多个URL，速度更快。当有多个URL需要抓取时，请一次性传入urls数组批量处理，比逐个调用快数倍。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "urls" : {
+            "description" : "URL列表，支持批量并行提取多个页面。推荐：当有多个URL时使用此参数，并行抓取速度比逐个调用快数倍。",
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "url" : {
+            "description" : "单个URL地址。推荐使用此参数，简单直接。",
+            "type" : "string"
+          },
+          "max_length" : {
+            "default" : 10000,
+            "description" : "每个URL内容的最大字符数，默认10000。设为0表示不限制。",
+            "type" : "integer"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "web_search",
+      "description" : "搜索网络信息。返回搜索结果（标题、URL、摘要）和AI答案。适用于查找信息、获取新闻、了解话题。【重要】搜索时请参考系统提示词中的当前时间，使用当前年份（如2026年），不要使用过时的年份。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "query" : {
+            "description" : "搜索关键词或问题。请使用当前年份，例如\"2026年招聘信息\"而非\"2024年\"",
+            "type" : "string"
+          },
+          "max_results" : {
+            "default" : 5,
+            "description" : "最大结果数，默认5",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "query" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "list_files",
+      "description" : "列出当前会话中用户上传的所有文件。返回文件名、类型、大小、摘要等信息。使用场景：需要了解用户上传了哪些文件时调用。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "session_id" : {
+            "description" : "会话 ID（可选，系统会自动注入）",
+            "type" : "string"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "read_file",
+      "description" : "读取指定文件的内容。支持分段读取大文件，可指定起始行和结束行。使用场景：需要查看文件具体内容时调用。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "file_id" : {
+            "description" : "文件 ID（从 list_files 获取）",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID（可选，系统会自动注入）",
+            "type" : "string"
+          },
+          "start_line" : {
+            "description" : "起始行号（可选，从 1 开始）",
+            "type" : "integer"
+          },
+          "end_line" : {
+            "description" : "结束行号（可选）",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "file_id" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "search_file",
+      "description" : "在文件中搜索关键词，返回匹配的行。使用场景：需要在文件中查找特定内容时调用。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "file_id" : {
+            "description" : "文件 ID（可选，不指定则搜索所有文件）",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID（可选，系统会自动注入）",
+            "type" : "string"
+          },
+          "keyword" : {
+            "description" : "搜索关键词",
+            "type" : "string"
+          }
+        },
+        "required" : [ "keyword" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "get_file_info",
+      "description" : "获取指定文件的详细信息，包括文件名、类型、大小、行数/页数、摘要等。使用场景：需要了解文件详情时调用。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "file_id" : {
+            "description" : "文件 ID",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID（可选，系统会自动注入）",
+            "type" : "string"
+          }
+        },
+        "required" : [ "file_id" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "get_file_path",
+      "description" : "获取用户上传文件的本地绝对路径。当你需要将用户上传的文件传给 run_skill_script 的 input 参数时，必须先调用此工具获取文件的本地路径。例如：使用 minimax-docx skill 处理用户上传的 docx 文件前，需要先获取其本地路径。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "file_id" : {
+            "description" : "文件 ID（从 list_files 获取）",
+            "type" : "string"
+          },
+          "session_id" : {
+            "description" : "会话 ID（可选，系统会自动注入）",
+            "type" : "string"
+          }
+        },
+        "required" : [ "file_id" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__execute",
+      "description" : "在沙箱中执行 bash 命令。命令在隔离环境中运行，受资源限制和安全策略约束。\n\n## 使用说明\n- 首次执行会自动创建会话，返回 sessionId 和 workingDirectory\n- 后续执行可传入 sessionId 复用会话，保持环境变量和工作目录状态\n- 生成的文件（图片、PDF、文档等）会自动检测并发送给用户\n\n## 自动注入的环境变量\n- `$SKILL_DIR`: 技能...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "command" : {
+            "type" : "string",
+            "description" : "要执行的命令。支持管道、重定向等 shell 特性。命令长度限制：最大 8192 字符。\nWindows 环境：优先使用 Git Bash（支持完整 bash 语法），如无则使用 PowerShell。"
+          },
+          "workingDirectory" : {
+            "type" : "string",
+            "description" : "工作目录。可选，默认使用会话的当前工作目录。可指定技能目录等外部路径。"
+          },
+          "timeout" : {
+            "type" : "integer",
+            "description" : "超时时间（毫秒）。可选，默认使用系统配置的超时时间。",
+            "minimum" : 1000,
+            "maximum" : 300000
+          },
+          "environment" : {
+            "type" : "object",
+            "description" : "额外的环境变量。可选，会与会话的环境变量合并。",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID。可选，如果不提供则创建新会话。\n建议复用会话以保持状态（环境变量、工作目录等）。"
+          }
+        },
+        "required" : [ "command" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__create_session",
+      "description" : "创建一个新的沙箱会话，返回会话 ID 和工作目录。\n\n## 使用场景\n- 需要预先创建会话以确定工作目录\n- 需要在特定目录（如技能目录）中执行多个命令\n- 需要设置特定的环境变量\n\n## 建议\n强烈建议指定 workingDirectory，以便在特定目录中执行命令。\n会话保持状态，后续命令可以访问之前命令创建的文件。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "workingDirectory" : {
+            "type" : "string",
+            "description" : "初始工作目录。强烈建议指定，如技能目录路径。不指定则使用会话专属临时目录。"
+          },
+          "environment" : {
+            "type" : "object",
+            "description" : "初始环境变量。可选。",
+            "additionalProperties" : {
+              "type" : "string"
+            }
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "会话名称。可选，用于日志和调试。"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__close_session",
+      "description" : "关闭指定会话，释放资源。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "要关闭的会话 ID"
+          },
+          "cleanup" : {
+            "type" : "boolean",
+            "description" : "是否清理会话目录。默认 true。",
+            "default" : true
+          }
+        },
+        "required" : [ "sessionId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_session_info",
+      "description" : "获取指定会话的详细信息，包括工作目录、环境变量等。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID"
+          }
+        },
+        "required" : [ "sessionId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__list_sessions",
+      "description" : "列出当前所有活跃的会话。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : { }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_command_history",
+      "description" : "获取指定会话的命令执行历史。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID"
+          },
+          "limit" : {
+            "type" : "integer",
+            "description" : "返回的最大记录数。默认 50。",
+            "default" : 50
+          }
+        },
+        "required" : [ "sessionId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_statistics",
+      "description" : "获取沙箱执行的统计信息。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID。可选，不提供则返回全局统计。"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_audit_logs",
+      "description" : "查询审计日志。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID 过滤。可选。"
+          },
+          "event" : {
+            "type" : "string",
+            "description" : "事件类型过滤。可选。"
+          },
+          "startTime" : {
+            "type" : "string",
+            "description" : "开始时间（ISO 格式）。可选。"
+          },
+          "endTime" : {
+            "type" : "string",
+            "description" : "结束时间（ISO 格式）。可选。"
+          },
+          "limit" : {
+            "type" : "integer",
+            "description" : "返回的最大记录数。默认 100。",
+            "default" : 100
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_resource_usage",
+      "description" : "获取系统资源使用情况。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : { }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_session_resource_usage",
+      "description" : "获取指定会话的资源使用情况。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID"
+          }
+        },
+        "required" : [ "sessionId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_system_info",
+      "description" : "获取系统信息。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : { }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__list_templates",
+      "description" : "列出可用的命令模板。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "category" : {
+            "type" : "string",
+            "description" : "模板类别过滤。可选。"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_template",
+      "description" : "获取指定命令模板的详细信息。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "templateId" : {
+            "type" : "string",
+            "description" : "模板 ID"
+          }
+        },
+        "required" : [ "templateId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__render_template",
+      "description" : "渲染命令模板，生成可执行的命令。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "templateId" : {
+            "type" : "string",
+            "description" : "模板 ID"
+          },
+          "params" : {
+            "type" : "object",
+            "description" : "模板参数",
+            "additionalProperties" : {
+              "oneOf" : [ {
+                "type" : "string"
+              }, {
+                "type" : "number"
+              }, {
+                "type" : "boolean"
+              } ]
+            }
+          }
+        },
+        "required" : [ "templateId" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__parse_output",
+      "description" : "解析命令输出的结构化数据。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "output" : {
+            "type" : "string",
+            "description" : "要解析的命令输出"
+          },
+          "format" : {
+            "type" : "string",
+            "description" : "输出格式。可选。可选值：json, csv, table, list, keyvalue, xml, yaml"
+          }
+        },
+        "required" : [ "output" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__execute_batch",
+      "description" : "批量执行多个命令。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID"
+          },
+          "commands" : {
+            "type" : "array",
+            "description" : "要执行的命令列表",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "id" : {
+                  "type" : "string"
+                },
+                "command" : {
+                  "type" : "string"
+                },
+                "workingDirectory" : {
+                  "type" : "string"
+                },
+                "timeout" : {
+                  "type" : "integer"
+                }
+              },
+              "required" : [ "id", "command" ]
+            }
+          },
+          "parallel" : {
+            "type" : "boolean",
+            "description" : "是否并行执行。默认 false。",
+            "default" : false
+          },
+          "stopOnFirstError" : {
+            "type" : "boolean",
+            "description" : "遇到错误是否停止。默认 false。",
+            "default" : false
+          }
+        },
+        "required" : [ "sessionId", "commands" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__suggest_commands",
+      "description" : "根据上下文建议命令。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "intent" : {
+            "type" : "string",
+            "description" : "用户意图描述"
+          },
+          "projectType" : {
+            "type" : "string",
+            "description" : "项目类型。可选值：node, java, python, unknown"
+          },
+          "lastCommand" : {
+            "type" : "string",
+            "description" : "最后执行的命令"
+          },
+          "lastExitCode" : {
+            "type" : "integer",
+            "description" : "最后命令的退出码"
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__list_files",
+      "description" : "列出沙箱中的文件。可以列出会话工作目录或共享目录中的文件。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string",
+            "description" : "要列出的目录路径。可选，默认为会话工作目录。"
+          },
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID。可选，用于获取会话工作目录。"
+          },
+          "recursive" : {
+            "type" : "boolean",
+            "description" : "是否递归列出子目录。默认 false。",
+            "default" : false
+          }
+        }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__export_file",
+      "description" : "将沙箱中的文件导出到共享目录。导出的文件可以被其他工具访问。导出后文件路径会包含在返回结果中。默认导出到共享目录，可被 Filesystem MCP 等工具访问。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "sourcePath" : {
+            "type" : "string",
+            "description" : "源文件路径（沙箱内路径，可以是相对路径或绝对路径）"
+          },
+          "targetPath" : {
+            "type" : "string",
+            "description" : "目标路径。可选，默认导出到共享目录并保持原文件名。"
+          },
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID。可选，用于组织导出文件到会话专属目录。"
+          }
+        },
+        "required" : [ "sourcePath" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__get_shared_directory",
+      "description" : "获取共享目录的路径。共享目录可以被 Filesystem MCP 等其他工具访问。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : { }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__read_file",
+      "description" : "读取沙箱中的文件内容。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string",
+            "description" : "文件路径"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "bash-sandbox__write_file",
+      "description" : "在沙箱中创建或写入文件。",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string",
+            "description" : "文件路径"
+          },
+          "content" : {
+            "type" : "string",
+            "description" : "文件内容"
+          },
+          "sessionId" : {
+            "type" : "string",
+            "description" : "会话 ID。可选，用于在会话目录中创建文件。"
+          }
+        },
+        "required" : [ "path", "content" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "fetch__fetch",
+      "description" : "Fetches a URL from the internet and optionally extracts its contents as markdown.\n\nAlthough originally you did not have internet access, and were advised to refuse and tell the user this, this tool...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "url" : {
+            "description" : "URL to fetch",
+            "format" : "uri",
+            "minLength" : 1,
+            "title" : "Url",
+            "type" : "string"
+          },
+          "max_length" : {
+            "default" : 5000,
+            "description" : "Maximum number of characters to return.",
+            "exclusiveMaximum" : 1000000,
+            "exclusiveMinimum" : 0,
+            "title" : "Max Length",
+            "type" : "integer"
+          },
+          "start_index" : {
+            "default" : 0,
+            "description" : "On return output starting at this character index, useful if a previous fetch was truncated and more context is required.",
+            "minimum" : 0,
+            "title" : "Start Index",
+            "type" : "integer"
+          },
+          "raw" : {
+            "default" : false,
+            "description" : "Get the actual HTML content of the requested page, without simplification.",
+            "title" : "Raw",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "url" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "time__get_current_time",
+      "description" : "Get current time in a specific timezones",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "timezone" : {
+            "type" : "string",
+            "description" : "IANA timezone name (e.g., 'America/New_York', 'Europe/London'). Use 'Asia/Shanghai' as local timezone if no timezone provided by the user."
+          }
+        },
+        "required" : [ "timezone" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "time__convert_time",
+      "description" : "Convert time between timezones",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "source_timezone" : {
+            "type" : "string",
+            "description" : "Source IANA timezone name (e.g., 'America/New_York', 'Europe/London'). Use 'Asia/Shanghai' as local timezone if no source timezone provided by the user."
+          },
+          "time" : {
+            "type" : "string",
+            "description" : "Time to convert in 24-hour format (HH:MM)"
+          },
+          "target_timezone" : {
+            "type" : "string",
+            "description" : "Target IANA timezone name (e.g., 'Asia/Tokyo', 'America/San_Francisco'). Use 'Asia/Shanghai' as local timezone if no target timezone provided by the user."
+          }
+        },
+        "required" : [ "source_timezone", "time", "target_timezone" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__read_file",
+      "description" : "Read the complete contents of a file as text. DEPRECATED: Use read_text_file instead.",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "tail" : {
+            "description" : "If provided, returns only the last N lines of the file",
+            "type" : "number"
+          },
+          "head" : {
+            "description" : "If provided, returns only the first N lines of the file",
+            "type" : "number"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__read_text_file",
+      "description" : "Read the complete contents of a file from the file system as text. Handles various text encodings and provides detailed error messages if the file cannot be read. Use this tool when you need to exa...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "tail" : {
+            "description" : "If provided, returns only the last N lines of the file",
+            "type" : "number"
+          },
+          "head" : {
+            "description" : "If provided, returns only the first N lines of the file",
+            "type" : "number"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__read_media_file",
+      "description" : "Read an image or audio file. Returns the base64 encoded data and MIME type. Only works within allowed directories.",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__read_multiple_files",
+      "description" : "Read the contents of multiple files simultaneously. This is more efficient than reading files one by one when you need to analyze or compare multiple files. Each file's content is returned with its...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "paths" : {
+            "minItems" : 1,
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "Array of file paths to read. Each path must be a string pointing to a valid file within allowed directories."
+          }
+        },
+        "required" : [ "paths" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__write_file",
+      "description" : "Create a new file or completely overwrite an existing file with new content. Use with caution as it will overwrite existing files without warning. Handles text content with proper encoding. Only wo...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "content" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "path", "content" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__edit_file",
+      "description" : "Make line-based edits to a text file. Each edit replaces exact line sequences with new content. Returns a git-style diff showing the changes made. Only works within allowed directories.",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "edits" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "properties" : {
+                "oldText" : {
+                  "type" : "string",
+                  "description" : "Text to search for - must match exactly"
+                },
+                "newText" : {
+                  "type" : "string",
+                  "description" : "Text to replace with"
+                }
+              },
+              "required" : [ "oldText", "newText" ]
+            }
+          },
+          "dryRun" : {
+            "default" : false,
+            "description" : "Preview changes using git-style diff format",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "path", "edits" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__create_directory",
+      "description" : "Create a new directory or ensure a directory exists. Can create multiple nested directories in one operation. If the directory already exists, this operation will succeed silently. Perfect for sett...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__list_directory",
+      "description" : "Get a detailed listing of all files and directories in a specified path. Results clearly distinguish between files and directories with [FILE] and [DIR] prefixes. This tool is essential for underst...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__list_directory_with_sizes",
+      "description" : "Get a detailed listing of all files and directories in a specified path, including sizes. Results clearly distinguish between files and directories with [FILE] and [DIR] prefixes. This tool is usef...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "sortBy" : {
+            "default" : "name",
+            "description" : "Sort entries by name or size",
+            "type" : "string",
+            "enum" : [ "name", "size" ]
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__directory_tree",
+      "description" : "Get a recursive tree view of files and directories as a JSON structure. Each entry includes 'name', 'type' (file/directory), and 'children' for directories. Files have no children array, while dire...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "excludePatterns" : {
+            "default" : [ ],
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__move_file",
+      "description" : "Move or rename files and directories. Can move files between directories and rename them in a single operation. If the destination exists, the operation will fail. Works across different directorie...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "source" : {
+            "type" : "string"
+          },
+          "destination" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "source", "destination" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__search_files",
+      "description" : "Recursively search for files and directories matching a pattern. The patterns should be glob-style patterns that match paths relative to the working directory. Use pattern like '*.ext' to match fil...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          },
+          "pattern" : {
+            "type" : "string"
+          },
+          "excludePatterns" : {
+            "default" : [ ],
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          }
+        },
+        "required" : [ "path", "pattern" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__get_file_info",
+      "description" : "Retrieve detailed metadata about a file or directory. Returns comprehensive information including size, creation time, last modified time, permissions, and type. This tool is perfect for understand...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "path" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "path" ]
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "filesystem__list_allowed_directories",
+      "description" : "Returns the list of directories that this server is allowed to access. Subdirectories within these allowed directories are also accessible. Use this to understand which directories and their nested...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : { }
+      }
+    },
+    "type" : "function"
+  }, {
+    "function" : {
+      "name" : "sequentialthinking__sequentialthinking",
+      "description" : "A detailed tool for dynamic and reflective problem-solving through thoughts.\nThis tool helps analyze problems through a flexible thinking process that can adapt and evolve.\nEach thought can build o...",
+      "parameters" : {
+        "type" : "object",
+        "properties" : {
+          "thought" : {
+            "type" : "string",
+            "description" : "Your current thinking step"
+          },
+          "nextThoughtNeeded" : {
+            "type" : "boolean",
+            "description" : "Whether another thought step is needed"
+          },
+          "thoughtNumber" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 9007199254740991,
+            "description" : "Current thought number (numeric value, e.g., 1, 2, 3)"
+          },
+          "totalThoughts" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 9007199254740991,
+            "description" : "Estimated total thoughts needed (numeric value, e.g., 5, 10)"
+          },
+          "isRevision" : {
+            "description" : "Whether this revises previous thinking",
+            "type" : "boolean"
+          },
+          "revisesThought" : {
+            "description" : "Which thought is being reconsidered",
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 9007199254740991
+          },
+          "branchFromThought" : {
+            "description" : "Branching point thought number",
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 9007199254740991
+          },
+          "branchId" : {
+            "description" : "Branch identifier",
+            "type" : "string"
+          },
+          "needsMoreThoughts" : {
+            "description" : "If more thoughts are needed",
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "thought", "nextThoughtNeeded", "thoughtNumber", "totalThoughts" ]
+      }
+    },
+    "type" : "function"
+  } ],
+  "temperature" : null,
+  "maxTokens" : null,
+  "responseTime" : "2026-05-15T06:31:53.281",
+  "durationMs" : 10868,
+  "finishReason" : "stop",
+  "promptTokens" : 0,
+  "completionTokens" : 0,
+  "totalTokens" : 0,
+  "responseContent" : "<think>The user wants me to extract the core chapter content from the graduation thesis document about \"对抗伪装系统设计\" (Adversarial Camouflage System Design for Object Detection Models).\n\nFrom what I've read, I can see this is a graduation thesis by 高兴伟 from 西安邮电大学, supervised by 张亚东. The thesis is about designing an adversarial camouflage system for object detection models.\n\nBased on the context, I need to search for keywords related to \"对抗伪装、目标检测、系统设计\" (adversarial camouflage, object detection, system design). The user wants me to focus on extracting core chapter content.\n\nLooking at the document structure:\n- Chapter 1: 绪论 (Introduction) - research background, significance, purpose, literature review\n- Chapter 2: 相关技术与理论基础 (Related technologies and theory) - deep learning basics, object detection algorithms, adversarial examples and attacks\n- Chapter 3: 系统需求分析与设计 (System requirements analysis and design) - functional/non-functional requirements, system architecture, module design\n- Chapter 4: 系统实现 (System implementation) - development environment, system architecture implementation, core functions, interface development\n- Chapter 5: 结论 (Conclusion)\n\nI've already read the full document content. Now I need to extract the core chapter content focusing on the keywords mentioned: \"对抗伪装、目标检测、系统设计\" (adversarial camouflage, object detection, system design).\n\nLet me provide a summary of the key sections based on what I've read:\n\n1. 系统需求分析与设计 (Chapter 3):\n- 功能需求分析: Image management, historical records, model management, object detection, adversarial attacks\n- 非功能需求分析\n- 系统总体架构设计: Three-layer architecture (Blueprint routing, Processor business logic, Utils utility)\n- 系统功能模块设计: Various modules for image management, model management, detection, attacks\n\n\n- 系统实现阶段 covers development environment setup with hardware and software configurations, followed by implementing Flask application with frontend and backend components. The core functionality includes Model Manager singleton pattern, adversarial attack algorithms, and performance optimization strategies. Interface and visualization implementation follows, with system integration and testing completed.\n\n系统还支持多层次的对抗攻击策略。数字域攻击涵盖九种核心算法，包括FGSM及其增强版本FGSM++、PGD、Momentum PGD、CW等方法，这些算法通过梯度符号、投影梯度下降和动量等机制生成对抗样本。物理域攻击则模拟真实世界的攻击场景，如AdvCam攻击和AdvShadow攻击等。\n\n系统还集成了CVPR 2022和CVPR 2020的官方实现，如ShadowAttack和AdvCam，支持快速模式和优化模式，并提供natural、rusty、dirty、generic等多种伪装风格。\n\n根据关键词搜索，我已识别出系统架构设计、核心算法实现和物理域攻击等关键内容。接下来需要整理这些信息，形成完整的摘要报告。\n</think>\n\n根据已读取的论文内容，我已完成关键词搜索和核心章节提取。以下是结果摘要：\n\n---\n\n## 📄 论文核心章节内容提取\n\n**论文题目**：面向目标检测模型的对抗伪装系统设计  \n**学生姓名**：高兴伟  \n**学院**：计算机学院  \n**专业**：软件工程  \n**指导老师**：张亚东  \n\n---\n\n### 🔍 核心关键词匹配结果\n\n| 关键词 | 相关内容位置 | 说明 |\n|--------|-------------|------|\n| **对抗伪装** | 第4章 4.3.2、4.4.1 | 物理域攻击算法、伪装对抗页面设计 |\n| **目标检测** | 第2章 2.2、第3章 3.3.3 | YOLO算法、系统目标检测模块 |\n| **系统设计** | 第3章 3.2、第4章 4.2 | 三层架构、Flask应用架构 |\n| **数字域攻击** | 第4章 4.3.2 | FGSM、PGD、CW等9种算法 |\n| **物理域攻击** | 第4章 4.3.2 | AdvCam、AdvShadow、ShadowAttack |\n| **补丁攻击** | 第4章 4.3.2 | EffectivePatchAttack、RP2风格、DAPatch |\n| **性能优化** | 第4章 4.3.3 | LRU缓存、懒加载、GPU加速 |\n| **前端界面** | 第4章 4.4.1 | Bootstrap 5、玻璃态设计、五大功能页面 |\n| **后端接口** | 第4章 4.4.2 | Blueprint模块化、RESTful风格 |\n| **Model Manager** | 第4章 4.3.1 | 单例模式、LRU缓存、线程安全 |\n\n---\n\n### 📑 核心章节摘要\n\n#### 1️⃣ 系统架构设计（3.2节）\n- **三层架构**：Blueprint路由层、Processor业务逻辑层、Utils工具层\n- **技术选型**：Flask + Jinja2 + JSON持久化\n- **模型管理**：Model Manager单例模式 + LRU缓存（最多5个模型）\n\n#### 2️⃣ 核心功能实现（4.3节）\n\n**数字域攻击算法（9种）**：\n| 算法 | 说明 |\n|------|------|\n| FGSM | 固定步长ε梯度扰动 |\n| FGSM++ | 多步迭代累积增强 |\n| Targeted FGSM | 定向目标攻击 |\n| Universal FGSM | 跨图像迁移攻击 |\n| PGD | 多步迭代+投影 |\n| Momentum PGD | 动量增强迁移性 |\n| CW | tanh变换+Adam优化 |\n\n**物理域攻击算法**：\n| 算法 | 说明 |\n|------|------|\n| AdvCam | 模拟镜头色差+晕影+模糊 |\n| AdvShadow | 差分进化优化阴影遮罩 |\n| ShadowAttack | CVPR 2022官方实现 |\n| combined | AdvCam + AdvShadow串联 |\n\n**补丁攻击**：支持EoT优化补丁、RP2风格、DAPatch可变形补丁\n\n#### 3️⃣ 性能优化策略（4.3.3节）\n1. LRU模型缓存（最多5个实例）\n2. 线程安全训练（daemon线程异步）\n3. 延迟加载（EffectivePatchAttack）\n4. GPU加速推理（CUDA并行计算）\n\n#### 4️⃣ 界面设计（4.4.1节）\n- **Bootstrap 5响应式布局** + 玻璃态设计主题\n- **五大功能页面**：首页、目标检测、伪装对抗、模型管理、模型训练\n\n---\n\n### ✅ 任务完成\n\n已成功提取论文核心章节内容，涵盖系统架构设计、对抗攻击算法实现、性能优化策略及界面设计等关键模块。",
+  "reasoningContent" : "",
+  "success" : true,
+  "errorMessage" : null
+}

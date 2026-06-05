@@ -498,7 +498,7 @@ public class ContextCompressionService {
             return result;
         }
 
-        String summary = generateLLMSummary(oldMessages, userId, modelName);
+        String summary = generateLLMSummary(oldMessages, sessionId, userId, modelName);
         
         List<Map<String, Object>> preservedToolResults = extractImportantToolResults(oldMessages);
 
@@ -573,7 +573,7 @@ public class ContextCompressionService {
         return result;
     }
 
-    private String generateLLMSummary(List<Map<String, Object>> messages, Long userId, String modelName) {
+    private String generateLLMSummary(List<Map<String, Object>> messages, String sessionId, Long userId, String modelName) {
         StringBuilder historyText = new StringBuilder();
         for (Map<String, Object> msg : messages) {
             String role = (String) msg.get("role");
@@ -614,7 +614,7 @@ public class ContextCompressionService {
         try {
             AIModelConfig modelConfig = resolveModelConfig(userId, modelName);
             if (modelConfig != null) {
-                String llmResponse = callLLMNonStream(prompt, modelConfig);
+                String llmResponse = callLLMNonStream(prompt, modelConfig, sessionId, userId);
                 if (llmResponse != null && !llmResponse.trim().isEmpty()) {
                     log.info("LLM summary generated successfully ({} chars)", llmResponse.length());
                     return llmResponse;
@@ -772,7 +772,7 @@ public class ContextCompressionService {
         return groups;
     }
 
-    private String callLLMNonStream(String prompt, AIModelConfig modelConfig) throws Exception {
+    private String callLLMNonStream(String prompt, AIModelConfig modelConfig, String sessionId, Long userId) throws Exception {
         List<Map<String, Object>> requestMessages = new ArrayList<>();
         Map<String, Object> systemMsg = new HashMap<>();
         systemMsg.put("role", "system");
@@ -789,6 +789,8 @@ public class ContextCompressionService {
                 .messages(requestMessages)
                 .temperature(0.3)
                 .maxTokens(500)
+                .sessionId(sessionId)
+                .userId(userId)
                 .build();
 
         log.info("[ContextCompression] 调用 LLM (chatComplete): model={}", modelConfig.getModelId());

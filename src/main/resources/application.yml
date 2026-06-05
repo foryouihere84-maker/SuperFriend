@@ -177,6 +177,8 @@ news:
     time-range: day
     # 搜索关键词（逗号分隔）
     queries: AI 人工智能,科技新闻,互联网热点
+    # 指定搜索引擎（可选），如 "bing news"，留空则使用默认引擎
+    engines:
 
 # 腾讯云 COS 配置
 tencent:
@@ -256,6 +258,8 @@ bash-sandbox:
   resource-reserve-ratio: 0.2
   # 会话超时时间（毫秒），默认 30 分钟
   session-timeout-ms: 1800000
+  # 会话文件延迟清理时间（毫秒），对话结束后保留文件一段时间再删除，默认 30 分钟
+  session-cleanup-delay-ms: 1800000
   # 最大命令长度
   max-command-length: 8192
   # 最大输出大小（字节），默认 10MB

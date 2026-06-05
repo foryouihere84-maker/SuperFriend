@@ -2,6 +2,7 @@ package com.superfriend.superfriend.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.superfriend.superfriend.dto.LLMCallRecord;
 import com.superfriend.superfriend.dto.LLMChunk;
 import com.superfriend.superfriend.dto.LLMCompleteResponse;
 import com.superfriend.superfriend.dto.LLMRequest;
@@ -27,6 +28,9 @@ public class OpenAICompatibleLLMClient implements LLMClient {
 
     @Autowired
     private CostTrackingService costTrackingService;
+
+    @Autowired
+    private LLMCallMonitorService llmCallMonitorService;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -55,6 +59,22 @@ public class OpenAICompatibleLLMClient implements LLMClient {
                                    Consumer<LLMChunk> onChunk) {
         final AtomicLong promptTokens = new AtomicLong(0);
         final AtomicLong completionTokens = new AtomicLong(0);
+        final StringBuilder responseBuilder = new StringBuilder();
+        final StringBuilder reasoningBuilder = new StringBuilder();
+        final String[] finishReasonHolder = {null};
+        final String[] errorHolder = {null};
+
+        // 开始监控记录
+        LLMCallRecord monitorRecord = null;
+        if (llmCallMonitorService != null) {
+            try {
+                monitorRecord = llmCallMonitorService.startCall(
+                        request.getSessionId(), request, tools);
+            } catch (Exception e) {
+                log.warn("[LLMClient] 启动监控记录失败: {}", e.getMessage(), e);
+            }
+        }
+
         HttpURLConnection connection = null;
         try {
             Map<String, Object> requestBody = buildRequestBody(request, tools, true);
@@ -70,11 +90,12 @@ public class OpenAICompatibleLLMClient implements LLMClient {
                 connection.setRequestProperty("Authorization", "Bearer " + request.getApiKey());
             }
             connection.setConnectTimeout(30000);
-            connection.setReadTimeout(120000);
+            connection.setReadTimeout(180000);  // 增加到 3 分钟，给大模型更多时间生成
 
             log.info("[LLMClient] 流式调用 AI API: {}, model={}", apiUrl, request.getModel());
 
             String jsonRequest = objectMapper.writeValueAsString(requestBody);
+            log.debug("[LLMClient] 请求体大小: {} 字节", jsonRequest.length());
             try (OutputStream os = connection.getOutputStream()) {
                 os.write(jsonRequest.getBytes(StandardCharsets.UTF_8));
             }
@@ -83,24 +104,65 @@ public class OpenAICompatibleLLMClient implements LLMClient {
             log.info("[LLMClient] API 响应码：{}", httpCode);
 
             if (httpCode == 200) {
-                parseSSEResponse(connection, request.getModel(), request, onChunk, promptTokens, completionTokens);
+                // 使用包装的 onChunk 收集响应内容
+                final LLMCallRecord finalMonitorRecord = monitorRecord;
+                Consumer<LLMChunk> monitoredOnChunk = chunk -> {
+                    // 收集响应内容
+                    if (chunk.hasContent()) {
+                        responseBuilder.append(chunk.getContent());
+                    }
+                    if (chunk.hasReasoningContent()) {
+                        reasoningBuilder.append(chunk.getReasoningContent());
+                    }
+                    // 收集完成原因
+                    if (chunk.getFinishReason() != null) {
+                        finishReasonHolder[0] = chunk.getFinishReason();
+                    }
+                    // 收集错误
+                    if (chunk.isError()) {
+                        errorHolder[0] = chunk.getError();
+                    }
+                    // 调用原始回调
+                    onChunk.accept(chunk);
+                };
+
+                parseSSEResponse(connection, request.getModel(), request, monitoredOnChunk, promptTokens, completionTokens);
             } else {
                 String errorDetail = readErrorStream(connection);
                 log.error("[LLMClient] API 请求失败：HTTP {}，错误响应：{}", httpCode, errorDetail);
+                errorHolder[0] = "API 请求失败：HTTP " + httpCode + " - " + errorDetail;
                 onChunk.accept(LLMChunk.builder()
                     .done(true)
                     .finishReason("error")
-                    .error("API 请求失败：HTTP " + httpCode + " - " + errorDetail)
+                    .error(errorHolder[0])
                     .build());
             }
         } catch (Exception e) {
             log.error("[LLMClient] 流式调用异常：{}", e.getMessage(), e);
+            errorHolder[0] = "流式调用异常：" + e.getMessage();
             onChunk.accept(LLMChunk.builder()
                 .done(true)
                 .finishReason("error")
-                .error("流式调用异常：" + e.getMessage())
+                .error(errorHolder[0])
                 .build());
         } finally {
+            // 结束监控记录
+            if (monitorRecord != null && llmCallMonitorService != null) {
+                try {
+                    llmCallMonitorService.endCall(
+                            monitorRecord,
+                            responseBuilder.toString(),
+                            reasoningBuilder.toString(),
+                            promptTokens.get(),
+                            completionTokens.get(),
+                            finishReasonHolder[0],
+                            errorHolder[0]
+                    );
+                } catch (Exception e) {
+                    log.warn("[LLMClient] 结束监控记录失败: {}", e.getMessage());
+                }
+            }
+
             if (connection != null) {
                 connection.disconnect();
             }
@@ -130,6 +192,11 @@ public class OpenAICompatibleLLMClient implements LLMClient {
             }
             if (chunk.hasToolCalls()) {
                 accumulateToolCalls(chunk.getToolCalls(), toolCalls);
+            }
+            // 【修复】处理累积的 tool_calls（MiniMax API 在流结束时才返回完整的 tool_calls）
+            if (chunk.hasAccumulatedToolCalls()) {
+                toolCalls.clear();
+                toolCalls.addAll(chunk.getAccumulatedToolCalls());
             }
             if (chunk.getUsage() != null) {
                 usageHolder[0] = chunk.getUsage();
@@ -209,6 +276,11 @@ public class OpenAICompatibleLLMClient implements LLMClient {
         body.put("model", request.getModel());
         body.put("messages", request.getMessages());
         body.put("stream", isStream);
+        if (isStream) {
+            Map<String, Object> streamOptions = new HashMap<>();
+            streamOptions.put("include_usage", true);
+            body.put("stream_options", streamOptions);
+        }
 
         if (request.getTemperature() != null) {
             body.put("temperature", request.getTemperature());
@@ -252,16 +324,26 @@ public class OpenAICompatibleLLMClient implements LLMClient {
     private void parseSSEResponse(HttpURLConnection connection, String model, LLMRequest request,
                                    Consumer<LLMChunk> onChunk, AtomicLong promptTokens, AtomicLong completionTokens) throws Exception {
         final List<LLMCompleteResponse.ToolCall> accumulatedToolCalls = new ArrayList<>();
-        
+        int lineCount = 0;
+        int contentChunks = 0;
+
         try (BufferedReader reader = new BufferedReader(
                 new InputStreamReader(connection.getInputStream(), StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
+                lineCount++;
+
+                // 每100行记录一次进度
+                if (lineCount % 100 == 0) {
+                    log.debug("[LLMClient] 已处理 {} 行 SSE 数据", lineCount);
+                }
+
                 if (line.startsWith("data: ")) {
                     String data = line.substring(6).trim();
 
                     if (data.equals("[DONE]")) {
+                        log.info("[LLMClient] 收到 [DONE] 信号，共处理 {} 行，{} 个内容块", lineCount, contentChunks);
                         LLMChunk doneChunk = LLMChunk.builder()
                             .done(true)
                             .finishReason("stop")
@@ -278,32 +360,32 @@ public class OpenAICompatibleLLMClient implements LLMClient {
 
                             if (choices.isArray() && choices.size() > 0) {
                                 JsonNode delta = choices.get(0).path("delta");
-                                
+
                                 String content = delta.path("content").asText(null);
                                 String reasoningContent = delta.path("reasoning_content").asText(null);
-                                
+
                                 if (content == null || content.isEmpty()) {
                                     content = delta.path("text").asText(null);
                                 }
-                                
+
                                 JsonNode toolCalls = delta.path("tool_calls");
                                 JsonNode finishReason = choices.get(0).path("finish_reason");
                                 JsonNode usage = jsonNode.path("usage");
 
                                 boolean hasFinishReason = finishReason != null && !finishReason.isMissingNode() && !finishReason.isNull();
-                                
+
                                 boolean hasReasoningContent = reasoningContent != null && !reasoningContent.isEmpty();
                                 boolean hasContent = content != null && !content.isEmpty();
                                 boolean hasToolCalls = toolCalls != null && !toolCalls.isMissingNode() && toolCalls.isArray() && toolCalls.size() > 0;
-                                
+
                                 if (hasToolCalls) {
                                     accumulateToolCalls(toolCalls, accumulatedToolCalls);
                                 }
-                                
+
                                 if (!hasContent && !hasReasoningContent && !hasFinishReason) {
 
                                 }
-                                
+
                                 if (hasReasoningContent) {
                                     LLMChunk reasoningChunk = LLMChunk.builder()
                                         .reasoningContent(reasoningContent)
@@ -311,33 +393,37 @@ public class OpenAICompatibleLLMClient implements LLMClient {
                                         .build();
                                     onChunk.accept(reasoningChunk);
                                 }
-                                
+
                                 if (hasContent) {
+                                    contentChunks++;
                                     LLMChunk contentChunk = LLMChunk.builder()
                                         .content(content)
                                         .done(false)
                                         .build();
                                     onChunk.accept(contentChunk);
                                 }
-                                
+
                                 if (hasFinishReason) {
                                     long prompt = 0;
                                     long completion = 0;
-                                    
+
                                     if (!usage.isMissingNode()) {
                                         prompt = usage.path("prompt_tokens").asLong(0);
                                         completion = usage.path("completion_tokens").asLong(0);
+                                        if (prompt == 0) prompt = usage.path("input_tokens").asLong(0);
+                                        if (completion == 0) completion = usage.path("output_tokens").asLong(0);
                                         promptTokens.set(prompt);
                                         completionTokens.set(completion);
                                     }
-                                    
+
                                     if (!accumulatedToolCalls.isEmpty()) {
                                         log.info("[LLMClient] 流式结束，累积 tool_calls 数量: {}", accumulatedToolCalls.size());
                                         for (LLMCompleteResponse.ToolCall tc : accumulatedToolCalls) {
                                             log.info("[LLMClient] tool_call: name={}, argumentsStr={}", tc.getName(), tc.getArgumentsStr());
                                         }
                                     }
-                                    
+
+                                    log.info("[LLMClient] 收到 finish_reason={}, 共处理 {} 行，{} 个内容块", finishReason.asText(null), lineCount, contentChunks);
                                     LLMChunk doneChunk = LLMChunk.builder()
                                         .done(true)
                                         .finishReason(finishReason.asText(null))
@@ -345,16 +431,25 @@ public class OpenAICompatibleLLMClient implements LLMClient {
                                         .accumulatedToolCalls(new ArrayList<>(accumulatedToolCalls))
                                         .build();
                                     onChunk.accept(doneChunk);
-                                    
+
 
                                 }
                             }
                         } catch (Exception e) {
-                            log.error("[LLMClient] 解析流数据失败：{}", e.getMessage());
+                            log.error("[LLMClient] 解析流数据失败：{}, 原始数据: {}", e.getMessage(), data.length() > 200 ? data.substring(0, 200) + "..." : data);
                         }
                     }
                 }
             }
+
+            // 如果循环正常结束但没有收到 [DONE] 或 finish_reason，手动发送完成信号
+            log.warn("[LLMClient] 流正常结束但未收到 [DONE] 信号，共处理 {} 行，{} 个内容块，手动发送完成", lineCount, contentChunks);
+            LLMChunk doneChunk = LLMChunk.builder()
+                .done(true)
+                .finishReason("stop")
+                .accumulatedToolCalls(new ArrayList<>(accumulatedToolCalls))
+                .build();
+            onChunk.accept(doneChunk);
         }
     }
 

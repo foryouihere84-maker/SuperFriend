@@ -29,7 +29,7 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 映射静态资源（CSS, JS, images 等）
+        // 映射静态资源（CSS, JS, images 等）- 排除 API 路径
         registry.addResourceHandler("/**")
                 .addResourceLocations("classpath:/static/")
                 .addResourceLocations("file:ui/dist/")
@@ -44,14 +44,6 @@ public class WebConfig implements WebMvcConfigurer {
     public void addViewControllers(ViewControllerRegistry registry) {
         // 根路径重定向到 chat（默认首页）
         registry.addRedirectViewController("/", "/chat");
-        
-        // 其他所有非 API 路径都转发到 index.html
-        // 这样 Vue Router 可以正确处理 /login, /chat, /mcp 等路由
-        registry.addViewController("/{path:[^\\\\.]*}")
-                .setViewName("forward:/index.html");
-        
-        registry.addViewController("/{paths:[^\\\\.]*}/**")
-                .setViewName("forward:/index.html");
     }
 
     public static class LoggingInterceptor implements HandlerInterceptor {
@@ -61,7 +53,7 @@ public class WebConfig implements WebMvcConfigurer {
         }
 
         @Override
-        public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, 
+        public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
                                 ModelAndView modelAndView) {
         }
 

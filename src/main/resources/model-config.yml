@@ -67,8 +67,8 @@ file-parsing:
 
   # 解析限制
   limits:
-    max-pdf-pages: 100
-    max-excel-rows: 1000
+    max-pdf-pages: 1000
+    max-excel-rows: 10000
     max-file-size-mb: 50
 
 # ===========================================

@@ -529,11 +529,81 @@ public class EnhancedPlanExecutor {
     }
 
     public enum StepStatus {
-        PENDING,
-        RUNNING,
-        COMPLETED,
-        FAILED,
-        SKIPPED
+        PENDING("待执行"),
+        WAITING_FOR_RESOURCE("等待资源"),
+        WAITING_FOR_USER_INPUT("等待用户输入"),
+        RUNNING("执行中"),
+        RETRYING("重试中"),
+        COMPLETED("已完成"),
+        FAILED("失败"),
+        SKIPPED("已跳过"),
+        CANCELLED("已取消");
+
+        private final String description;
+
+        StepStatus(String description) {
+            this.description = description;
+        }
+
+        public String getDescription() { return description; }
+
+        /**
+         * 检查是否可以转换到新状态
+         */
+        public boolean canTransitionTo(StepStatus newStatus) {
+            switch (this) {
+                case PENDING:
+                    return newStatus == WAITING_FOR_RESOURCE ||
+                           newStatus == WAITING_FOR_USER_INPUT ||
+                           newStatus == RUNNING ||
+                           newStatus == SKIPPED ||
+                           newStatus == CANCELLED;
+                case WAITING_FOR_RESOURCE:
+                    return newStatus == RUNNING ||
+                           newStatus == FAILED ||
+                           newStatus == SKIPPED ||
+                           newStatus == CANCELLED;
+                case WAITING_FOR_USER_INPUT:
+                    return newStatus == RUNNING ||
+                           newStatus == FAILED ||
+                           newStatus == CANCELLED;
+                case RUNNING:
+                    return newStatus == COMPLETED ||
+                           newStatus == FAILED ||
+                           newStatus == RETRYING ||
+                           newStatus == WAITING_FOR_RESOURCE ||
+                           newStatus == CANCELLED;
+                case RETRYING:
+                    return newStatus == RUNNING ||
+                           newStatus == FAILED ||
+                           newStatus == CANCELLED;
+                case FAILED:
+                    return newStatus == RETRYING ||
+                           newStatus == SKIPPED ||
+                           newStatus == CANCELLED;
+                case COMPLETED:
+                case SKIPPED:
+                case CANCELLED:
+                    return false;  // 终态，不可转换
+                default:
+                    return false;
+            }
+        }
+
+        /**
+         * 是否是终态
+         */
+        public boolean isTerminal() {
+            return this == COMPLETED || this == SKIPPED || this == CANCELLED;
+        }
+
+        /**
+         * 是否是活跃状态（正在执行）
+         */
+        public boolean isActive() {
+            return this == RUNNING || this == RETRYING ||
+                   this == WAITING_FOR_RESOURCE || this == WAITING_FOR_USER_INPUT;
+        }
     }
 
     @Data

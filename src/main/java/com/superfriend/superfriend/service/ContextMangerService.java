@@ -1,6 +1,5 @@
 package com.superfriend.superfriend.service;
 
-import com.superfriend.superfriend.config.KnowledgeExtractionProperties;
 import com.superfriend.superfriend.constant.ChatMode;
 import com.superfriend.superfriend.entity.ChatCompression;
 import com.superfriend.superfriend.entity.ChatHistory;
@@ -39,18 +38,7 @@ public class ContextMangerService {
 
     @Autowired
     @Lazy
-    private KnowledgeExtractorService knowledgeExtractorService;
-
-    @Autowired
-    @Lazy
-    private ConversationGraphService conversationGraphService;
-
-    @Autowired
-    private KnowledgeExtractionProperties extractionProperties;
-
-    @Autowired
-    @Lazy
-    private UserProfileService userProfileService;
+    private MemoryPalaceService memoryPalaceService;
 
     @Autowired
     @Lazy
@@ -292,14 +280,16 @@ public class ContextMangerService {
             record.setRole(msg.get("role"));
             String content = msg.get("content");
             if (multimodalContentStorageService.needsProcessing(content)) {
-                MultimodalContentStorageService.ProcessedContent processed = 
+                MultimodalContentStorageService.ProcessedContent processed =
                     multimodalContentStorageService.processContent(content);
                 content = processed.getContent();
                 if (!processed.getMediaInfo().isEmpty()) {
-                    log.info("消息内容包含多模态数据，已替换 {} 个媒体占位符", 
+                    log.info("消息内容包含多模态数据，已替换 {} 个媒体占位符",
                         processed.getMediaInfo().size());
                 }
             }
+            // 截断保护：防止超长内容导致数据库写入失败
+            content = truncateIfNeeded(content, "保存历史消息");
             record.setContent(content);
             messageMapper.insert(record);
         }
@@ -329,6 +319,7 @@ public class ContextMangerService {
         record.setHistoryId(history.getId());
         record.setSessionId(sessionId);
         record.setRole(role);
+        content = truncateIfNeeded(content, "保存单条消息");
         record.setContent(content);
         messageMapper.insert(record);
 
@@ -378,41 +369,62 @@ public class ContextMangerService {
     }
 
     /**
-     * 检查并触发知识提取
-     * 每轮对话完成后都提取最新一轮的知识点
+     * 检查并触发记忆提取
+     * 每轮对话完成后都提取最新一轮的记忆
      */
     private void checkAndTriggerExtraction(Long userId, String sessionId, String model) {
         if (userId == null || sessionId == null) {
             return;
         }
 
-        // 如果正在处理中，跳过（防止重复提取）
-        if (knowledgeExtractorService.isProcessing(sessionId)) {
-            log.debug("Session {} 正在处理中，跳过", sessionId);
+        // 获取当前对话的最后一条用户消息和助手回复
+        List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
+        if (records.size() < 2) {
             return;
         }
 
-        // 获取当前对话的所有消息
-        List<Map<String, Object>> messages = new ArrayList<>();
-        List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
-        for (ChatMessageRecord record : records) {
-            Map<String, Object> msg = new HashMap<>();
-            msg.put("role", record.getRole());
-            msg.put("content", record.getContent());
-            messages.add(msg);
+        // 找最后一条用户消息和助手回复
+        String lastUserMessage = null;
+        String lastAssistantReply = null;
+        for (int i = records.size() - 1; i >= 0; i--) {
+            ChatMessageRecord record = records.get(i);
+            if ("assistant".equals(record.getRole()) && lastAssistantReply == null) {
+                lastAssistantReply = record.getContent();
+            } else if ("user".equals(record.getRole()) && lastUserMessage == null) {
+                lastUserMessage = record.getContent();
+            }
+            if (lastUserMessage != null && lastAssistantReply != null) {
+                break;
+            }
         }
 
-        // 检查是否有完整的对话轮次
-        if (knowledgeExtractorService.shouldTriggerExtraction(messages)) {
-            log.info("触发知识提取: sessionId={}, messageCount={}", sessionId, messages.size());
-
-            // 异步提取（会自动去重，只提取新知识）
-            knowledgeExtractorService.extractAsync(userId, sessionId, messages, model);
+        if (lastUserMessage != null) {
+            log.info("触发记忆提取: sessionId={}", sessionId);
+            // 异步提取记忆
+            memoryPalaceService.createFromConversationAsync(userId, sessionId, lastUserMessage, lastAssistantReply);
         }
     }
 
     public void saveTurn(String sessionId, Long userId, String model, String mode,
                          String userMessage, String assistantMessage) {
+        saveTurn(sessionId, userId, model, mode, userMessage, assistantMessage, null, null);
+    }
+
+    /**
+     * 保存对话轮次（支持多模态内容）
+     *
+     * @param sessionId 会话ID
+     * @param userId 用户ID
+     * @param model 模型
+     * @param mode 模式
+     * @param userMessage 用户消息（文本）
+     * @param assistantMessage 助手消息
+     * @param userContent 用户消息（多模态内容，可为null）
+     * @param assistantContent 助手消息（多模态内容，可为null）
+     */
+    public void saveTurn(String sessionId, Long userId, String model, String mode,
+                         String userMessage, String assistantMessage,
+                         Object userContent, Object assistantContent) {
         List<Map<String, String>> existingMessages = new ArrayList<>();
         List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
         for (ChatMessageRecord record : records) {
@@ -421,18 +433,42 @@ public class ContextMangerService {
             msg.put("content", record.getContent());
             existingMessages.add(msg);
         }
-        
+
+        // 用户消息：优先使用多模态内容，否则使用文本
         Map<String, String> userMsg = new HashMap<>();
         userMsg.put("role", "user");
-        userMsg.put("content", userMessage);
+        userMsg.put("content", serializeContent(userContent, userMessage));
         existingMessages.add(userMsg);
 
+        // 助手消息：优先使用多模态内容，否则使用文本
         Map<String, String> assistantMsg = new HashMap<>();
         assistantMsg.put("role", "assistant");
-        assistantMsg.put("content", assistantMessage);
+        assistantMsg.put("content", serializeContent(assistantContent, assistantMessage));
         existingMessages.add(assistantMsg);
 
         saveOrUpdateSession(sessionId, userId, model, mode, existingMessages);
+    }
+
+    /**
+     * 序列化消息内容
+     * 如果是字符串，直接返回
+     * 如果是多模态内容（List/Map），序列化为 JSON 字符串
+     */
+    private String serializeContent(Object content, String fallbackText) {
+        if (content == null) {
+            return fallbackText != null ? fallbackText : "";
+        }
+        if (content instanceof String) {
+            return (String) content;
+        }
+        try {
+            // 多模态内容序列化为 JSON
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            return mapper.writeValueAsString(content);
+        } catch (Exception e) {
+            log.warn("序列化多模态内容失败: {}", e.getMessage());
+            return fallbackText != null ? fallbackText : content.toString();
+        }
     }
 
     // ==================== 消息列表构建 ====================
@@ -502,23 +538,38 @@ public class ContextMangerService {
 
     // ==================== 记忆提取 ====================
 
+    /**
+     * 提取并保存记忆
+     * 使用记忆宫殿系统进行智能提取
+     */
     public void extractAndSaveMemory(String sessionId, Long userId, String model) {
         if (userId == null) {
             return;
         }
         try {
-            List<Map<String, Object>> messages = new ArrayList<>();
             List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
-            for (ChatMessageRecord record : records) {
-                Map<String, Object> msg = new HashMap<>();
-                msg.put("role", record.getRole());
-                msg.put("content", record.getContent());
-                messages.add(msg);
+            if (records.size() < 2) {
+                return;
             }
 
-            if (messages.size() >= 2) {
-                knowledgeExtractorService.extractAsync(userId, sessionId, messages, model);
-                log.info("已触发异步知识提取 (session={}, userId={})", sessionId, userId);
+            // 找最后一条用户消息和助手回复
+            String lastUserMessage = null;
+            String lastAssistantReply = null;
+            for (int i = records.size() - 1; i >= 0; i--) {
+                ChatMessageRecord record = records.get(i);
+                if ("assistant".equals(record.getRole()) && lastAssistantReply == null) {
+                    lastAssistantReply = record.getContent();
+                } else if ("user".equals(record.getRole()) && lastUserMessage == null) {
+                    lastUserMessage = record.getContent();
+                }
+                if (lastUserMessage != null && lastAssistantReply != null) {
+                    break;
+                }
+            }
+
+            if (lastUserMessage != null) {
+                memoryPalaceService.createFromConversationAsync(userId, sessionId, lastUserMessage, lastAssistantReply);
+                log.info("已触发记忆宫殿提取 (session={}, userId={})", sessionId, userId);
             }
         } catch (Exception e) {
             log.warn("自动提取记忆失败：{}", e.getMessage());
@@ -526,67 +577,34 @@ public class ContextMangerService {
     }
 
     /**
-     * 结束对话，触发图谱提炼到全局图谱
-     * 在对话结束时调用，将对话级图谱提炼到全局图谱并更新用户画像
+     * 结束对话，触发记忆提炼
+     * 记忆宫殿系统会自动处理记忆的提取和强化
      */
     public void finalizeConversation(String sessionId, Long userId) {
         finalizeConversation(sessionId, userId, null);
     }
 
     /**
-     * 结束对话，触发知识提取和图谱提炼
-     * 完整流程：知识提取 → 全局提炼 → 用户画像更新
+     * 结束对话，触发记忆提炼
+     * 记忆宫殿系统会自动处理记忆的提取和强化
      *
      * @param sessionId 会话ID
      * @param userId 用户ID
-     * @param model 模型名称（用于知识提取）
+     * @param model 模型名称（未使用，保留兼容性）
      */
     public void finalizeConversation(String sessionId, Long userId, String model) {
         if (userId == null || sessionId == null) {
             return;
         }
 
-        log.info("开始结束对话流程: sessionId={}, userId={}", sessionId, userId);
+        log.info("结束对话，触发记忆提炼: sessionId={}, userId={}", sessionId, userId);
 
-        // 1. 检查是否已完成提取
-        if (knowledgeExtractorService.isExtractionCompleted(sessionId)) {
-            log.info("Session {} 已完成知识提取，直接触发图谱提炼", sessionId);
-            // 已提取过，直接触发图谱提炼
-            conversationGraphService.finalizeConversationGraph(userId, sessionId);
-            return;
-        }
-
-        // 2. 获取对话消息
-        List<Map<String, Object>> messages = new ArrayList<>();
-        List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
-        for (ChatMessageRecord record : records) {
-            Map<String, Object> msg = new HashMap<>();
-            msg.put("role", record.getRole());
-            msg.put("content", record.getContent());
-            messages.add(msg);
-        }
-
-        // 3. 使用双重触发机制检查是否应该提取
-        if (!knowledgeExtractorService.shouldTriggerExtraction(messages)) {
-            log.info("不满足知识提取条件，跳过提取: sessionId={}, messageCount={}",
-                sessionId, messages.size());
-            return;
-        }
-
-        // 4. 触发知识提取（提取完成后会自动触发图谱提炼）
-        if (extractionProperties.isAutoExtractOnFinalize()) {
-            knowledgeExtractorService.extractAsync(userId, sessionId, messages, model);
-            log.info("已触发异步知识提取 (session={}, userId={}, messages={})",
-                sessionId, userId, messages.size());
-        } else {
-            // 配置关闭自动提取时，直接触发图谱提炼（假设已有对话级图谱）
-            conversationGraphService.finalizeConversationGraph(userId, sessionId);
-        }
+        // 触发记忆提取
+        extractAndSaveMemory(sessionId, userId, model);
     }
 
     /**
      * 强制重新提取并结束对话
-     * 忽略已完成标记，重新进行知识提取
      */
     public void forceFinalizeConversation(String sessionId, Long userId, String model) {
         if (userId == null || sessionId == null) {
@@ -595,32 +613,51 @@ public class ContextMangerService {
 
         log.info("强制重新提取并结束对话: sessionId={}, userId={}", sessionId, userId);
 
-        // 清除提取状态
-        knowledgeExtractorService.clearExtractionStatus(sessionId);
-
-        // 重新执行结束流程
-        finalizeConversation(sessionId, userId, model);
+        // 直接执行提取
+        extractAndSaveMemory(sessionId, userId, model);
     }
 
     /**
-     * 检查会话是否已完成知识提取
+     * 检查会话是否已完成记忆提取
+     * 记忆宫殿系统是实时提取的，此方法保留兼容性
      */
     public boolean isExtractionCompleted(String sessionId) {
-        return knowledgeExtractorService.isExtractionCompleted(sessionId);
+        // 记忆宫殿系统是实时提取的，始终返回 true
+        return true;
     }
 
     /**
-     * 结束对话并同步提炼图谱
+     * 结束对话并同步提炼记忆
      */
     public void finalizeConversationSync(String sessionId, Long userId) {
         if (userId == null || sessionId == null) {
             return;
         }
         try {
-            conversationGraphService.finalizeConversationGraphSync(userId, sessionId);
-            log.info("对话图谱提炼完成 (session={}, userId={})", sessionId, userId);
+            // 同步提取记忆
+            List<ChatMessageRecord> records = getMessagesBySessionId(sessionId);
+            if (records.size() >= 2) {
+                String lastUserMessage = null;
+                String lastAssistantReply = null;
+                for (int i = records.size() - 1; i >= 0; i--) {
+                    ChatMessageRecord record = records.get(i);
+                    if ("assistant".equals(record.getRole()) && lastAssistantReply == null) {
+                        lastAssistantReply = record.getContent();
+                    } else if ("user".equals(record.getRole()) && lastUserMessage == null) {
+                        lastUserMessage = record.getContent();
+                    }
+                    if (lastUserMessage != null && lastAssistantReply != null) {
+                        break;
+                    }
+                }
+
+                if (lastUserMessage != null) {
+                    memoryPalaceService.createFromConversation(userId, sessionId, lastUserMessage, lastAssistantReply);
+                }
+            }
+            log.info("对话记忆同步提取完成 (session={}, userId={})", sessionId, userId);
         } catch (Exception e) {
-            log.warn("对话图谱提炼失败：{}", e.getMessage());
+            log.warn("对话记忆同步提取失败：{}", e.getMessage());
         }
     }
 
@@ -660,5 +697,21 @@ public class ContextMangerService {
         allMessages.add(assistantMsg);
 
         return allMessages;
+    }
+
+    /**
+     * 截断过长的消息内容，防止数据库写入失败
+     * MEDIUMTEXT 最大 16MB，保守限制 15MB
+     */
+    private String truncateIfNeeded(String content, String context) {
+        if (content == null) return null;
+        int maxLength = 15_000_000;
+        if (content.length() > maxLength) {
+            int originalLength = content.length();
+            content = content.substring(0, maxLength) +
+                "\n\n[内容过长已截断，原始长度: " + originalLength + " 字符]";
+            log.warn("{} 内容过长，已截断: {} -> {}", context, originalLength, maxLength);
+        }
+        return content;
     }
 }

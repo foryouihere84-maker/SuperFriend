@@ -180,7 +180,14 @@ public static class CreateCommand
             body.Append(sectPr);
 
             mainPart.Document.Save();
-            Console.WriteLine($"Created {docType} document: {output}");
+
+            // Output standardized JSON for system to detect output file
+            Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
+            {
+                success = true,
+                outputFile = Path.GetFullPath(output),
+                message = $"Created {docType} document"
+            }));
         });
 
         return cmd;

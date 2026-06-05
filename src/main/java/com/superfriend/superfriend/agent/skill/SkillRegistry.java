@@ -446,7 +446,25 @@ public class SkillRegistry {
         }
 
         StringBuilder content = new StringBuilder();
+
+        // 【关键】在最前面添加醒目的工作流提示
         content.append("# ").append(skill.getName()).append("\n\n");
+        content.append("================================================================================\n");
+        content.append("⚡ CRITICAL: HOW TO USE THIS SKILL\n");
+        content.append("================================================================================\n");
+        content.append("After loading this skill, you MUST use `run_skill_script` to execute scripts.\n");
+        content.append("DO NOT directly call bash-sandbox or write_file - use run_skill_script instead.\n");
+        content.append("(run_skill_script internally uses bash-sandbox with proper setup)\n\n");
+        content.append("**Correct Workflow:**\n");
+        content.append("1. You have already called `load_skill(skill_name=\"").append(skillName).append("\")` ✓\n");
+        content.append("2. NOW call `run_skill_script` with the appropriate script:\n");
+        content.append("   run_skill_script(\n");
+        content.append("     skill_name=\"").append(skillName).append("\",\n");
+        content.append("     script_name=\"scripts/xxx.py\",  // See Available Scripts below\n");
+        content.append("     parameters={...}\n");
+        content.append("   )\n");
+        content.append("================================================================================\n\n");
+
         content.append("## Description\n").append(skill.getDescription()).append("\n\n");
 
         if (skill.getCategory() != null) {
@@ -499,19 +517,28 @@ public class SkillRegistry {
                     java.io.File scriptsDir = new java.io.File(skillDir, "scripts");
                     String[] availableScripts = null;  // 用于后续示例
                     if (scriptsDir.exists() && scriptsDir.isDirectory()) {
-                        content.append("**Scripts Directory**: `").append(scriptsDir.getAbsolutePath()).append("`\n");
+                        content.append("## 📜 Available Scripts (CRITICAL - Use with run_skill_script)\n\n");
+                        content.append("**Scripts Directory**: `").append(scriptsDir.getAbsolutePath()).append("`\n\n");
+
                         String[] scripts = scriptsDir.list((dir, name) ->
                             name.endsWith(".sh") || name.endsWith(".py") || name.endsWith(".js") ||
                             name.endsWith(".csx") || name.endsWith(".ps1"));
                         if (scripts != null && scripts.length > 0) {
                             availableScripts = scripts;  // 保存用于示例
-                            // 使用 scripts/ 前缀格式，与 run_skill_script 调用格式一致
-                            content.append("**Available Scripts** (use with run_skill_script):\n");
+                            content.append("**Available Scripts**:\n");
                             for (String script : scripts) {
                                 content.append("- `scripts/").append(script).append("`\n");
                             }
+                            content.append("\n**⚡ IMMEDIATE ACTION REQUIRED:**\n");
+                            content.append("Call `run_skill_script` NOW with one of the scripts above:\n");
+                            content.append("```\n");
+                            content.append("run_skill_script(\n");
+                            content.append("  skill_name=\"").append(skillName).append("\",\n");
+                            content.append("  script_name=\"scripts/").append(availableScripts[0]).append("\",\n");
+                            content.append("  parameters={\"key\": \"value\"}\n");
+                            content.append(")\n");
+                            content.append("```\n\n");
                         }
-                        content.append("\n");
                     }
 
                     // 参考文档目录
@@ -677,8 +704,22 @@ public class SkillRegistry {
                     fullPath = assetPath;
                     log.debug("资源在 assets/ 目录中找到: {}", assetPath);
                 } else {
-                    log.warn("资源文件不存在: {} (尝试了 references/ 和 assets/)", Paths.get(basePath, resourcePath));
-                    return null;
+                    // 尝试 scripts/ 目录（用于 Samples 等代码资源）
+                    Path scriptsPath = Paths.get(basePath, "scripts", resourcePath);
+                    if (Files.exists(scriptsPath)) {
+                        fullPath = scriptsPath;
+                        log.debug("资源在 scripts/ 目录中找到: {}", scriptsPath);
+                    } else {
+                        // 尝试搜索 scripts 子目录（如 scripts/dotnet/Project/Samples/）
+                        Path foundPath = searchInScriptsSubdirs(basePath, resourcePath);
+                        if (foundPath != null) {
+                            fullPath = foundPath;
+                            log.debug("资源在 scripts 子目录中找到: {}", foundPath);
+                        } else {
+                            log.warn("资源文件不存在: {} (尝试了 references/, assets/, scripts/ 及子目录)", Paths.get(basePath, resourcePath));
+                            return null;
+                        }
+                    }
                 }
             }
         }
@@ -692,7 +733,40 @@ public class SkillRegistry {
             return null;
         }
     }
-    
+
+    /**
+     * 在 scripts 子目录中搜索资源文件
+     * 用于处理如 Samples/*.cs 等位于 scripts/dotnet/Project/Samples/ 的文件
+     */
+    private Path searchInScriptsSubdirs(String basePath, String resourcePath) {
+        Path scriptsDir = Paths.get(basePath, "scripts");
+        if (!Files.exists(scriptsDir) || !Files.isDirectory(scriptsDir)) {
+            return null;
+        }
+
+        // 获取资源文件名（如 Samples/DocumentCreationSamples.cs -> DocumentCreationSamples.cs）
+        final String targetFileName;
+        if (resourcePath.contains("/")) {
+            targetFileName = resourcePath.substring(resourcePath.lastIndexOf("/") + 1);
+        } else if (resourcePath.contains("\\")) {
+            targetFileName = resourcePath.substring(resourcePath.lastIndexOf("\\") + 1);
+        } else {
+            targetFileName = resourcePath;
+        }
+
+        // 搜索 scripts 目录下的所有子目录
+        try {
+            return Files.walk(scriptsDir, 5)  // 最大深度5层
+                .filter(Files::isRegularFile)
+                .filter(path -> path.getFileName().toString().equals(targetFileName))
+                .findFirst()
+                .orElse(null);
+        } catch (IOException e) {
+            log.debug("搜索 scripts 子目录失败: {}", e.getMessage());
+            return null;
+        }
+    }
+
     @SuppressWarnings("unchecked")
     private String getDatabaseSkillResource(DatabaseSkill skill, String resourcePath, Long userId) {
         try {
@@ -782,6 +856,14 @@ public class SkillRegistry {
     
     public ScriptExecutor.ScriptExecutionResult executeSkillScript(
             String skillName, String scriptName, Map<String, Object> parameters) {
+        return executeSkillScript(skillName, scriptName, parameters, null);
+    }
+
+    /**
+     * 执行技能脚本（带 sessionId，确保会话一致性）
+     */
+    public ScriptExecutor.ScriptExecutionResult executeSkillScript(
+            String skillName, String scriptName, Map<String, Object> parameters, String sessionId) {
         Skill skill = skills.get(skillName);
 
         if (skill == null && skillService != null) {
@@ -801,11 +883,11 @@ public class SkillRegistry {
             return executeDatabaseSkillScript(dbSkill, scriptName, parameters);
         }
 
-        // 使用 SkillScriptRunner 通过 bash-sandbox 执行脚本
-        log.info("通过 SkillScriptRunner 执行脚本: skill={}, script={}", skillName, scriptName);
+        // 使用 SkillScriptRunner 通过 bash-sandbox 执行脚本（传入 sessionId）
+        log.info("通过 SkillScriptRunner 执行脚本: skill={}, script={}, sessionId={}", skillName, scriptName, sessionId);
 
         SkillScriptRunner.ScriptExecutionResult result = skillScriptRunner.executeScript(
-            skillName, scriptName, parameters);
+            skillName, scriptName, parameters, sessionId);
 
         // 转换为兼容的返回类型
         ScriptExecutor.ScriptExecutionResult compatResult = new ScriptExecutor.ScriptExecutionResult();
@@ -817,10 +899,22 @@ public class SkillRegistry {
         compatResult.setExecutionTime(result.getExecutionTime());
         compatResult.setParsedOutput(result.getParsedOutput());
         compatResult.setOutputFiles(result.getOutputFiles());
+        compatResult.setOutputDirectory(result.getOutputDirectory());
 
         return compatResult;
     }
-    
+
+    /**
+     * 清理技能输出目录
+     * 文件发送给前端后调用此方法清理临时文件
+     */
+    public void cleanupSkillOutputDirectory(String outputDirectory) {
+        if (outputDirectory == null || outputDirectory.isEmpty()) {
+            return;
+        }
+        skillScriptRunner.cleanupOutputDirectory(outputDirectory);
+    }
+
     private ScriptExecutor.ScriptExecutionResult executeDatabaseSkillScript(
             DatabaseSkill skill, String scriptName, Map<String, Object> parameters) {
         
