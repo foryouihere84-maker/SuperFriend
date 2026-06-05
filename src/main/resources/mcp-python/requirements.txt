@@ -1,4 +1,0 @@
-mcp-server-fetch>=0.6.0
-mcp-server-time>=0.6.0
-mcp>=1.0.0
-psutil>=5.9.0
