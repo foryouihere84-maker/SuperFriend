@@ -18,10 +18,15 @@ public class ReasoningChain {
     private LocalDateTime endTime;
     private ReasoningStatus status;
 
+<<<<<<< HEAD
     // 只保留连续失败的限制，移除重复工具调用的限制
     // 原因：模型可能需要多次调用同一工具（如分步生成），或成功后调用其他工具（如 send_file）
     // maxIterations 和 maxConsecutiveErrors 已经足够防止无限循环
     private static final int MAX_CONSECUTIVE_FAILURES = 5;
+=======
+    private static final int MAX_CONSECUTIVE_FAILURES = 3;
+    private static final int MAX_SAME_TOOL_CALLS = 2;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
     private final Map<String, Integer> toolCallCounts = new LinkedHashMap<>();
     private final Map<String, Integer> toolFailureCounts = new LinkedHashMap<>();
@@ -29,7 +34,12 @@ public class ReasoningChain {
     private TerminationReason terminationReason = null;
 
     public enum TerminationReason {
+<<<<<<< HEAD
         CONSECUTIVE_FAILURES("连续失败次数过多");
+=======
+        CONSECUTIVE_FAILURES("连续失败次数过多"),
+        REPEATED_TOOL_CALL("同一工具重复调用过多");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         private final String description;
         TerminationReason(String description) { this.description = description; }
@@ -63,7 +73,11 @@ public class ReasoningChain {
         step.setContent(thought);
         step.setTimestamp(LocalDateTime.now());
         steps.add(step);
+<<<<<<< HEAD
         log.debug("[ReasoningChain-{}] Thought #{}: {}", sessionId, step.getStepNumber(),
+=======
+        log.debug("[ReasoningChain-{}] Thought #{}: {}", sessionId, step.getStepNumber(), 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 truncate(thought, 100));
         return step;
     }
@@ -72,11 +86,21 @@ public class ReasoningChain {
         String toolSignature = toolName + "_" + (params != null ? params.hashCode() : 0);
         int callCount = toolCallCounts.getOrDefault(toolSignature, 0) + 1;
         toolCallCounts.put(toolSignature, callCount);
+<<<<<<< HEAD
 
         // 移除重复工具调用的早期终止逻辑
         // 只记录调用次数用于统计，不触发终止
         log.debug("[ReasoningChain-{}] 工具 {} 调用次数: {}", sessionId, toolName, callCount);
 
+=======
+        
+        if (callCount > MAX_SAME_TOOL_CALLS) {
+            terminationReason = TerminationReason.REPEATED_TOOL_CALL;
+            log.warn("[ReasoningChain-{}] 工具 {} 重复调用 {} 次，建议终止", 
+                    sessionId, toolName, callCount);
+        }
+        
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         ReasoningStep step = new ReasoningStep();
         step.setStepNumber(steps.size() + 1);
         step.setType(StepType.ACTION);
@@ -84,7 +108,11 @@ public class ReasoningChain {
         step.setParameters(params);
         step.setTimestamp(LocalDateTime.now());
         steps.add(step);
+<<<<<<< HEAD
         log.debug("[ReasoningChain-{}] Action #{}: {} with params {}", sessionId,
+=======
+        log.debug("[ReasoningChain-{}] Action #{}: {} with params {}", sessionId, 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 step.getStepNumber(), toolName, params != null ? params.keySet() : "none");
         return step;
     }
@@ -96,12 +124,17 @@ public class ReasoningChain {
             if (lastAction != null) {
                 String toolName = lastAction.getToolName();
                 toolFailureCounts.merge(toolName, 1, Integer::sum);
+<<<<<<< HEAD
 
                 // 更新工具签名的失败计数
                 String toolSignature = toolName + "_" + (lastAction.getParameters() != null ? lastAction.getParameters().hashCode() : 0);
                 toolFailureCounts.merge(toolSignature, 1, Integer::sum);
             }
 
+=======
+            }
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 terminationReason = TerminationReason.CONSECUTIVE_FAILURES;
                 log.warn("[ReasoningChain-{}] 连续失败 {} 次，建议终止", sessionId, consecutiveFailures);
@@ -109,7 +142,11 @@ public class ReasoningChain {
         } else {
             consecutiveFailures = 0;
         }
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         ReasoningStep step = new ReasoningStep();
         step.setStepNumber(steps.size() + 1);
         step.setType(StepType.OBSERVATION);
@@ -117,7 +154,11 @@ public class ReasoningChain {
         step.setSuccess(success);
         step.setTimestamp(LocalDateTime.now());
         steps.add(step);
+<<<<<<< HEAD
         log.debug("[ReasoningChain-{}] Observation #{}: {} [{}]", sessionId,
+=======
+        log.debug("[ReasoningChain-{}] Observation #{}: {} [{}]", sessionId, 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 step.getStepNumber(), truncate(observation, 50), success ? "SUCCESS" : "FAILED");
         return step;
     }

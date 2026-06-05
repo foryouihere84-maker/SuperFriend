@@ -1,7 +1,10 @@
 package com.superfriend.superfriend.service;
 
 import com.superfriend.superfriend.dto.AIChatRequest;
+<<<<<<< HEAD
 import com.superfriend.superfriend.dto.ChatMessage;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import com.superfriend.superfriend.dto.ChatMessageContent;
 import com.superfriend.superfriend.dto.UserIntent;
 import lombok.extern.slf4j.Slf4j;
@@ -12,9 +15,13 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+<<<<<<< HEAD
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+=======
+import java.util.List;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 /**
  * 用户意图识别服务
@@ -35,10 +42,13 @@ public class UserIntentService {
     @Lazy
     private LLMIntentClassifier llmIntentClassifier;
 
+<<<<<<< HEAD
     @Autowired
     @Lazy
     private SessionFileIndexService sessionFileIndexService;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Value("${intent.classifier.enabled:true}")
     private boolean llmClassifierEnabled;
 
@@ -110,7 +120,10 @@ public class UserIntentService {
         List<String> audios = request.getAudios();
         List<String> videos = request.getVideos();
         Long userId = request.getUserId();
+<<<<<<< HEAD
         String sessionId = request.getSessionId();
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         log.info("开始分析用户意图，文本: {}, 图片: {}, 文档: {}, 音频: {}, 视频: {}",
                 text != null ? (text.length() > 50 ? text.substring(0, 50) + "..." : text) : "null",
@@ -121,6 +134,7 @@ public class UserIntentService {
 
         // 收集附件类型
         List<String> attachmentTypes = collectAttachmentTypes(content, images, documents, audios, videos);
+<<<<<<< HEAD
         boolean hasAttachments = !attachmentTypes.isEmpty();
 
         // 提取对话历史（用于上下文感知的意图分类）
@@ -149,6 +163,13 @@ public class UserIntentService {
                     return correctedIntent;
                 }
 
+=======
+
+        // 优先使用 LLM 意图分类
+        if (llmClassifierEnabled) {
+            UserIntent llmIntent = llmIntentClassifier.classifyIntent(text, attachmentTypes, userId);
+            if (llmIntent != null && llmIntent.getConfidence() >= 0.7) {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 log.info("LLM 意图分类成功: type={}, confidence={}", llmIntent.getType(), llmIntent.getConfidence());
                 llmIntent.setUserText(text);
                 // 补充文件信息
@@ -175,6 +196,7 @@ public class UserIntentService {
     }
 
     /**
+<<<<<<< HEAD
      * 判断是否为解析类意图
      */
     private boolean isParseIntent(UserIntent.Type type) {
@@ -243,6 +265,8 @@ public class UserIntentService {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 收集附件类型
      */
     private List<String> collectAttachmentTypes(List<ChatMessageContent> content,
@@ -361,12 +385,18 @@ public class UserIntentService {
         }
 
         // 2. 检测文档文件解析意图（PDF、DOCX 等）
+<<<<<<< HEAD
         // 重要：当用户上传文档时，必须先解析文档内容，然后才能让AI回答问题
         // 因为大多数模型不支持直接处理文档URL
         // mimeType 设为 null，让 FileParseService.inferMimeType() 从 URL 推断
         if (documents != null && !documents.isEmpty()) {
             log.info("检测到文档文件，返回 PARSE_FILE（需要先解析文档内容）");
             UserIntent intent = UserIntent.parseFile(documents.get(0), null, null);
+=======
+        if (documents != null && !documents.isEmpty()) {
+            log.info("检测到文档文件，返回 PARSE_FILE");
+            UserIntent intent = UserIntent.parseFile(documents.get(0), "application/octet-stream", null);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             intent.setUserText(text);
             return intent;
         }
@@ -593,11 +623,17 @@ public class UserIntentService {
         }
 
         // 从便捷方式的文档提取
+<<<<<<< HEAD
         // 根据 URL 扩展名推断 MIME 类型
         if (request.getDocuments() != null) {
             for (String docUrl : request.getDocuments()) {
                 String mimeType = inferDocumentMimeType(docUrl);
                 files.add(new String[]{docUrl, mimeType});
+=======
+        if (request.getDocuments() != null) {
+            for (String docUrl : request.getDocuments()) {
+                files.add(new String[]{docUrl, "application/octet-stream"});
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
         }
 
@@ -653,6 +689,7 @@ public class UserIntentService {
     public boolean needsFileParsing(AIChatRequest request) {
         return hasFiles(request.getContent(), request.getImages());
     }
+<<<<<<< HEAD
 
     /**
      * 根据文档 URL 推断 MIME 类型
@@ -734,4 +771,6 @@ public class UserIntentService {
 
         return null;
     }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 }

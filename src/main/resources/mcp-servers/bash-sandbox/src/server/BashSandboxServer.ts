@@ -120,6 +120,7 @@ export class BashSandboxServer {
             tools: [
                 {
                     name: 'execute',
+<<<<<<< HEAD
                     description: '在沙箱中执行 bash 命令。命令在隔离环境中运行，受资源限制和安全策略约束。\n\n' +
                         '## 使用说明\n' +
                         '- 首次执行会自动创建会话，返回 sessionId 和 workingDirectory\n' +
@@ -139,13 +140,22 @@ export class BashSandboxServer {
                         '# 3. 输出文件使用环境变量\n' +
                         'execute(command="python -c \\"import os; open(os.environ[\'SKILL_OUTPUT_DIR\']+\'/output.txt\', \'w\')\\"")\n' +
                         '```',
+=======
+                    description: '在沙箱中执行 bash 命令。命令在隔离环境中运行，受资源限制和安全策略约束。' +
+                        '执行结果包含 sessionId 和 workingDirectory，可用于后续命令。' +
+                        '生成的文件（图片、PDF、文档等）会自动发送给用户，无需手动导出。',
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     inputSchema: {
                         type: 'object',
                         properties: {
                             command: {
                                 type: 'string',
+<<<<<<< HEAD
                                 description: '要执行的命令。支持管道、重定向等 shell 特性。命令长度限制：最大 8192 字符。\n' +
                                     'Windows 环境：优先使用 Git Bash（支持完整 bash 语法），如无则使用 PowerShell。'
+=======
+                                description: '要执行的命令。支持管道、重定向等 shell 特性。命令长度限制：最大 8192 字符。'
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                             },
                             workingDirectory: {
                                 type: 'string',
@@ -166,8 +176,12 @@ export class BashSandboxServer {
                             },
                             sessionId: {
                                 type: 'string',
+<<<<<<< HEAD
                                 description: '会话 ID。可选，如果不提供则创建新会话。\n' +
                                     '建议复用会话以保持状态（环境变量、工作目录等）。'
+=======
+                                description: '会话 ID。可选，如果不提供则创建新会话。建议复用会话以保持状态。'
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                             }
                         },
                         required: ['command']
@@ -175,6 +189,7 @@ export class BashSandboxServer {
                 },
                 {
                     name: 'create_session',
+<<<<<<< HEAD
                     description: '创建一个新的沙箱会话，返回会话 ID 和工作目录。\n\n' +
                         '## 使用场景\n' +
                         '- 需要预先创建会话以确定工作目录\n' +
@@ -182,6 +197,10 @@ export class BashSandboxServer {
                         '- 需要设置特定的环境变量\n\n' +
                         '## 建议\n' +
                         '强烈建议指定 workingDirectory，以便在特定目录中执行命令。\n' +
+=======
+                    description: '创建一个新的沙箱会话，返回会话 ID 和工作目录。' +
+                        '建议指定 workingDirectory 以便在特定目录（如技能目录）中执行命令。' +
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                         '会话保持状态，后续命令可以访问之前命令创建的文件。',
                     inputSchema: {
                         type: 'object',
@@ -226,7 +245,11 @@ export class BashSandboxServer {
                 },
                 {
                     name: 'get_session_info',
+<<<<<<< HEAD
                     description: '获取指定会话的详细信息，包括工作目录、环境变量等。',
+=======
+                    description: '获取指定会话的详细信息。',
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     inputSchema: {
                         type: 'object',
                         properties: {

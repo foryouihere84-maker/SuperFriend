@@ -6,16 +6,28 @@
 tencent:
   ocr:
     enabled: true
+<<<<<<< HEAD
     secret-id: your_secret_id
     secret-key: your_secret_key
     region: ap-beijing
+=======
+    secret-id: 
+    secret-key: 
+    region: 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
   # 腾讯云 ASR 服务配置
   asr:
     enabled: true
+<<<<<<< HEAD
     secret-id: your_secret_id
     secret-key: your_secret_key
     region: ap-beijing
+=======
+    secret-id: 
+    secret-key: 
+    region: 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 # Stable Diffusion 图片生成配置
 sd:
@@ -67,8 +79,13 @@ file-parsing:
 
   # 解析限制
   limits:
+<<<<<<< HEAD
     max-pdf-pages: 1000
     max-excel-rows: 10000
+=======
+    max-pdf-pages: 100
+    max-excel-rows: 1000
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     max-file-size-mb: 50
 
 # ===========================================

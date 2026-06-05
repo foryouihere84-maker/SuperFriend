@@ -11,7 +11,10 @@ import com.superfriend.superfriend.entity.ChatMessageRecord;
 import com.superfriend.superfriend.service.AIService;
 import com.superfriend.superfriend.service.AIProcessHistoryService;
 import com.superfriend.superfriend.service.ContextMangerService;
+<<<<<<< HEAD
 import com.superfriend.superfriend.service.SessionFileIndexService;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import javax.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import lombok.var;
@@ -45,9 +48,12 @@ public class AIController {
     @Autowired
     private ContextMangerService contextMangerService;
 
+<<<<<<< HEAD
     @Autowired
     private SessionFileIndexService sessionFileIndexService;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private static final DateTimeFormatter FILE_NAME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
     private static final DateTimeFormatter DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final int MAX_AI_CONTENT_LENGTH = 10 * 1024 * 1024;
@@ -556,11 +562,15 @@ public class AIController {
                 userId = 1L;
             }
             contextMangerService.finalizeConversation(sessionId, userId);
+<<<<<<< HEAD
 
             // 清理会话文件索引和临时文件
             sessionFileIndexService.clearSessionFiles(sessionId);
 
             log.info("对话结束，已触发图谱提炼并清理临时文件: sessionId={}, userId={}", sessionId, userId);
+=======
+            log.info("对话结束，已触发图谱提炼: sessionId={}, userId={}", sessionId, userId);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return ApiResponse.success("图谱提炼已触发");
         } catch (Exception e) {
             log.error("结束对话失败: {}", e.getMessage(), e);

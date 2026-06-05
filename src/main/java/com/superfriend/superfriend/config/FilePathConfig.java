@@ -5,17 +5,23 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
 import java.io.File;
+<<<<<<< HEAD
 import java.nio.file.Path;
 import java.nio.file.Paths;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 /**
  * 统一文件路径配置
  * 集中管理所有文件路径，包括临时目录、沙箱目录、技能目录等
+<<<<<<< HEAD
  *
  * 跨平台兼容性：
  * - 所有路径使用 File.separator 或 Paths.get() 处理
  * - 相对路径转换为绝对路径（基于应用工作目录）
  * - Linux 部署时自动适配路径格式
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
  */
 @Data
 @Configuration
@@ -23,12 +29,15 @@ import java.nio.file.Paths;
 public class FilePathConfig {
 
     /**
+<<<<<<< HEAD
      * 应用根目录（用于计算相对路径的基准）
      * 默认使用当前工作目录
      */
     private String appHomeDir = System.getProperty("user.dir");
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 临时文件目录（用户上传等）
      * 默认: uploads/temp
      */
@@ -65,18 +74,22 @@ public class FilePathConfig {
     private String sharedDir;
 
     /**
+<<<<<<< HEAD
      * 技能输出目录（所有技能生成的文件统一存放）
      * 默认: uploads/skill_outputs
      */
     private String skillOutputDir = "uploads/skill_outputs";
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 临时文件 TTL（小时）
      * 默认: 24小时
      */
     private long tempFileTtlHours = 24;
 
     /**
+<<<<<<< HEAD
      * 获取应用根目录的绝对路径
      */
     public String getAppHomeDir() {
@@ -120,13 +133,19 @@ public class FilePathConfig {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 获取导出目录（如果未设置则返回沙箱目录/exports）
      */
     public String getExportDir() {
         if (exportDir == null || exportDir.isEmpty()) {
             return sandboxDir + File.separator + "exports";
         }
+<<<<<<< HEAD
         return toAbsolutePath(exportDir);
+=======
+        return exportDir;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     /**
@@ -136,6 +155,7 @@ public class FilePathConfig {
         if (sharedDir == null || sharedDir.isEmpty()) {
             return sandboxDir + File.separator + "shared";
         }
+<<<<<<< HEAD
         return toAbsolutePath(sharedDir);
     }
 
@@ -153,6 +173,9 @@ public class FilePathConfig {
             }
         }
         return absolutePath;
+=======
+        return sharedDir;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     /**
@@ -164,10 +187,22 @@ public class FilePathConfig {
 
     /**
      * 获取平台相关的沙箱根目录
+<<<<<<< HEAD
      * Windows 使用系统临时目录，Linux 也使用系统临时目录
      */
     public String getPlatformSandboxDir() {
         // 统一使用系统临时目录，确保跨平台兼容
         return System.getProperty("java.io.tmpdir") + File.separator + "superfriend_sandbox";
+=======
+     * Windows 使用 windows-root-dir，其他系统使用 root-dir
+     */
+    public String getPlatformSandboxDir() {
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("win")) {
+            // Windows 使用系统临时目录
+            return System.getProperty("java.io.tmpdir") + File.separator + "superfriend_sandbox";
+        }
+        return sandboxDir;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 }

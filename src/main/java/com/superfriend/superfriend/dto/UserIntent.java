@@ -93,11 +93,14 @@ public class UserIntent {
      */
     private boolean needsSearch;
 
+<<<<<<< HEAD
     /**
      * 优化后的提示词（LLM优化后的用户意图描述）
      */
     private String optimizedPrompt;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     // ============ 静态工厂方法 ============
 
     public static UserIntent chat() {

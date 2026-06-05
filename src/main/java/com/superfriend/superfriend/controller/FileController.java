@@ -1,8 +1,11 @@
 package com.superfriend.superfriend.controller;
 
 import com.superfriend.superfriend.dto.ApiResponse;
+<<<<<<< HEAD
 import com.superfriend.superfriend.entity.UserFile;
 import com.superfriend.superfriend.mapper.UserFileMapper;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.Data;
@@ -13,7 +16,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.PostConstruct;
+<<<<<<< HEAD
 import javax.annotation.Resource;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,7 +32,10 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+<<<<<<< HEAD
 import java.util.stream.Collectors;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 @Slf4j
 @RestController
@@ -43,11 +52,14 @@ public class FileController {
     private static final String DEFAULT_UPLOAD_DIR = "uploads/temp";
     private Path uploadPath;
 
+<<<<<<< HEAD
     private static final int MAX_STORAGE_MB = 100;
 
     @Resource
     private UserFileMapper userFileMapper;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @PostConstruct
     public void init() {
         String dir = (uploadDir != null && !uploadDir.isEmpty()) ? uploadDir : DEFAULT_UPLOAD_DIR;
@@ -282,6 +294,7 @@ public class FileController {
         private int totalCount;
         private int successCount;
     }
+<<<<<<< HEAD
 
     // ==================== 用户文件管理接口 ====================
 
@@ -411,4 +424,6 @@ public class FileController {
         private Integer maxSizeMB;
         private Double usedPercent;
     }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 }

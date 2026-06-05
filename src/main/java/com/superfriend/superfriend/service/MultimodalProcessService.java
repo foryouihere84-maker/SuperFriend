@@ -265,7 +265,10 @@ public class MultimodalProcessService {
             imageResponse.setContent(imageDataUrl);
             imageResponse.setSessionId(request.getSessionId());
             imageResponse.setResourceId(resourceId);  // 设置资源 ID
+<<<<<<< HEAD
             log.info("[图片生成] 发送图片响应, resourceId={}, content长度={}", resourceId, imageDataUrl.length());
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             // 【修复】设置生成元数据
             if (generationTimeMs != null) {
                 imageResponse.setGenerationTimeMs(generationTimeMs);

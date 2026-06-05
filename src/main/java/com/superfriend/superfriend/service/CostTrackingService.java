@@ -49,7 +49,10 @@ public class CostTrackingService {
         setModelPricing("gemini-1.5-pro", 0.0035, 0.0105);
         setModelPricing("llama-3-70b", 0.0007, 0.0009);
         setModelPricing("qwen-max", 0.0004, 0.0012);
+<<<<<<< HEAD
         setModelPricing("minimax-m2.7", 0.001, 0.004);
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         setModelPricing("default", 0.001, 0.002);
     }
 

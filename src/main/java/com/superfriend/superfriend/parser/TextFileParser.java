@@ -454,6 +454,7 @@ public class TextFileParser implements FileParser {
                 }
                 String type = parts[0];
                 String fileName = parts[1];
+<<<<<<< HEAD
                 // 检查文件名是否为空
                 if (fileName == null || fileName.trim().isEmpty()) {
                     log.error("temp:// URL 中文件名为空: {}", fileUrl);
@@ -461,13 +462,20 @@ public class TextFileParser implements FileParser {
                 }
                 Path localPath = Paths.get("uploads", "temp", type, fileName);
                 log.debug("解析 temp:// URL: {} -> {}", fileUrl, localPath.toAbsolutePath());
+=======
+                Path localPath = Paths.get("uploads", "temp", type, fileName);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 return new FileInputStream(localPath.toFile());
             } else {
                 // 普通本地文件路径
                 return new FileInputStream(fileUrl);
             }
         } catch (Exception e) {
+<<<<<<< HEAD
             log.error("解析文件 URL 失败: {}, workDir={}, error: {}", fileUrl, System.getProperty("user.dir"), e.getMessage());
+=======
+            log.error("解析文件 URL 失败: {}, error: {}", fileUrl, e.getMessage());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return null;
         }
     }

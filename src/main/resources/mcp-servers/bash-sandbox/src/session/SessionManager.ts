@@ -142,6 +142,7 @@ export class SessionManager {
     }
 
     private setDefaultEnvironment(
+<<<<<<< HEAD
         env: Map<string, string>,
         sessionId: string,
         sessionDir: string
@@ -155,10 +156,18 @@ export class SessionManager {
         const combinedPath = defaultPath + separator + systemPath;
         env.set('PATH', combinedPath);
 
+=======
+        env: Map<string, string>, 
+        sessionId: string, 
+        sessionDir: string
+    ): void {
+        env.set('PATH', this.platformAdapter.getDefaultPath());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         env.set('HOME', sessionDir);
         env.set('TEMP', path.join(sessionDir, 'tmp'));
         env.set('TMP', path.join(sessionDir, 'tmp'));
         env.set('SANDBOX_SESSION_ID', sessionId);
+<<<<<<< HEAD
 
         // 【新增】继承用户环境变量
         // 保留常用的用户配置
@@ -187,6 +196,12 @@ export class SessionManager {
             if (!env.has('LC_ALL')) {
                 env.set('LC_ALL', 'C.UTF-8');
             }
+=======
+        
+        if (!this.platformAdapter.isWindows()) {
+            env.set('LANG', 'C.UTF-8');
+            env.set('LC_ALL', 'C.UTF-8');
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
     }
 

@@ -22,7 +22,11 @@ public class MessageContentBuilder {
 
     /**
      * 从请求构建用户消息内容
+<<<<<<< HEAD
      * 优先级：content > (message + images + documents + audios + videos) > message
+=======
+     * 优先级：content > (message + images) > message
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      *
      * @param request AI 对话请求
      * @return 消息内容，可能是 String 或 List<Map<String, Object>>
@@ -34,6 +38,7 @@ public class MessageContentBuilder {
             return convertContentToMaps(request.getContent());
         }
 
+<<<<<<< HEAD
         // 2. 检查是否有任何便捷方式的文件附件
         boolean hasImages = request.getImages() != null && !request.getImages().isEmpty();
         boolean hasDocuments = request.getDocuments() != null && !request.getDocuments().isEmpty();
@@ -53,6 +58,12 @@ public class MessageContentBuilder {
                 request.getAudios(),
                 request.getVideos()
             );
+=======
+        // 2. 文本 + 图片便捷方式
+        if (request.getImages() != null && !request.getImages().isEmpty()) {
+            log.debug("构建多模态消息：文本 + {} 张图片", request.getImages().size());
+            return buildMultimodalContent(request.getMessage(), request.getImages());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
 
         // 3. 纯文本（向后兼容）
@@ -156,6 +167,7 @@ public class MessageContentBuilder {
      * @return 多模态内容列表
      */
     private List<Map<String, Object>> buildMultimodalContent(String text, List<String> imageUrls) {
+<<<<<<< HEAD
         return buildMultimodalContentWithFiles(text, imageUrls, null, null, null);
     }
 
@@ -172,6 +184,8 @@ public class MessageContentBuilder {
     private List<Map<String, Object>> buildMultimodalContentWithFiles(
             String text, List<String> imageUrls,
             List<String> documents, List<String> audios, List<String> videos) {
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         List<Map<String, Object>> contents = new ArrayList<>();
 
         // 添加文本
@@ -197,6 +211,7 @@ public class MessageContentBuilder {
             }
         }
 
+<<<<<<< HEAD
         // 添加文档（使用 file_url 类型）
         if (documents != null) {
             for (String docUrl : documents) {
@@ -255,10 +270,13 @@ public class MessageContentBuilder {
             }
         }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         return contents;
     }
 
     /**
+<<<<<<< HEAD
      * 从 URL 推断文档 MIME 类型
      */
     private String inferMimeType(String url) {
@@ -308,6 +326,8 @@ public class MessageContentBuilder {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 将 ChatMessageContent 列表转换为 Map 列表
      * 支持文本、图片、音频、视频
      *

@@ -296,6 +296,7 @@ public static class EditContentCommand
     {
         var inputOpt = new Option<string>("--input") { Description = "Input DOCX file", Required = true };
         var outputOpt = new Option<string>("--output") { Description = "Output file path" };
+<<<<<<< HEAD
         var mappingOpt = new Option<string>("--mapping") { Description = "JSON file mapping placeholder names to values" };
         var dataOpt = new Option<string>("--data") { Description = "JSON string mapping placeholder names to values (alternative to --mapping)" };
         var patternOpt = new Option<string>("--pattern") { Description = "Placeholder pattern with capture group for the name" };
@@ -304,12 +305,22 @@ public static class EditContentCommand
         var cmd = new Command("fill-placeholders", "Replace placeholders with values from a mapping file or JSON string")
         {
             inputOpt, outputOpt, mappingOpt, dataOpt, patternOpt
+=======
+        var mappingOpt = new Option<string>("--mapping") { Description = "JSON file mapping placeholder names to values", Required = true };
+        var patternOpt = new Option<string>("--pattern") { Description = "Placeholder pattern with capture group for the name" };
+        patternOpt.DefaultValueFactory = _ => @"\{\{(\w+)\}\}";
+
+        var cmd = new Command("fill-placeholders", "Replace placeholders with values from a mapping file")
+        {
+            inputOpt, outputOpt, mappingOpt, patternOpt
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         };
 
         cmd.SetAction((parseResult) =>
         {
             var input = parseResult.GetValue(inputOpt)!;
             var output = parseResult.GetValue(outputOpt) ?? input;
+<<<<<<< HEAD
             var mappingPath = parseResult.GetValue(mappingOpt);
             var dataString = parseResult.GetValue(dataOpt);
             var pattern = parseResult.GetValue(patternOpt)!;
@@ -334,6 +345,18 @@ public static class EditContentCommand
                     var mappingJson = File.ReadAllText(mappingPath);
                     mapping = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson) ?? [];
                 }
+=======
+            var mappingPath = parseResult.GetValue(mappingOpt)!;
+            var pattern = parseResult.GetValue(patternOpt)!;
+
+            if (!File.Exists(mappingPath)) { Console.Error.WriteLine($"Mapping file not found: {mappingPath}"); return; }
+
+            var mappingJson = File.ReadAllText(mappingPath);
+            Dictionary<string, string> mapping;
+            try
+            {
+                mapping = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson) ?? [];
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
             catch (System.Text.Json.JsonException ex)
             {

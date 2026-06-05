@@ -2,6 +2,7 @@ package com.superfriend.superfriend.service;
 
 import com.superfriend.superfriend.agent.skill.SkillRegistry;
 import com.superfriend.superfriend.config.FilePathConfig;
+<<<<<<< HEAD
 import com.superfriend.superfriend.dto.ChatMessageContent;
 import com.superfriend.superfriend.dto.FileIndexEntry;
 import com.superfriend.superfriend.entity.Prompt;
@@ -9,6 +10,9 @@ import com.superfriend.superfriend.entity.ChatCompression;
 import com.superfriend.superfriend.entity.AgentTaskPlan;
 import com.superfriend.superfriend.mapper.ChatCompressionMapper;
 import com.superfriend.superfriend.mapper.AgentTaskPlanMapper;
+=======
+import com.superfriend.superfriend.entity.Prompt;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,6 +31,13 @@ public class SystemContextBuilder {
 
     @Autowired
     @Lazy
+<<<<<<< HEAD
+=======
+    private UserProfileService userProfileService;
+
+    @Autowired
+    @Lazy
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private KnowledgeGraphService knowledgeGraphService;
 
     @Autowired
@@ -38,6 +49,7 @@ public class SystemContextBuilder {
     private SkillService skillService;
 
     @Autowired
+<<<<<<< HEAD
     @Lazy
     private MemoryRetrievalService memoryRetrievalService;
 
@@ -56,6 +68,10 @@ public class SystemContextBuilder {
     @Lazy
     private SessionFileIndexService sessionFileIndexService;
 
+=======
+    private FilePathConfig filePathConfig;
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     /**
      * 最大系统提示词长度（字符数），约等于 8000 tokens
      */
@@ -64,8 +80,13 @@ public class SystemContextBuilder {
     /**
      * 各部分最大长度限制
      */
+<<<<<<< HEAD
     private static final int MAX_KNOWLEDGE_GRAPH_LENGTH = 800;
     private static final int MAX_MEMORY_PALACE_LENGTH = 1000;
+=======
+    private static final int MAX_USER_PROFILE_LENGTH = 500;
+    private static final int MAX_KNOWLEDGE_GRAPH_LENGTH = 800;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     // 技能目录不限制长度，完整展示
 
     /**
@@ -79,7 +100,10 @@ public class SystemContextBuilder {
         private String userMessage;
         private boolean enableUserProfile = true;
         private boolean enableKnowledgeGraph = true;
+<<<<<<< HEAD
         private boolean enableMemoryPalace = true;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         private boolean enableSkillCatalog = true;
         private boolean enableToolList = false;
         private String customBasePrompt;  // 自定义基础提示词
@@ -118,11 +142,14 @@ public class SystemContextBuilder {
             return this;
         }
 
+<<<<<<< HEAD
         public BuildConfig enableMemoryPalace(boolean enable) {
             this.enableMemoryPalace = enable;
             return this;
         }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         public BuildConfig enableSkillCatalog(boolean enable) {
             this.enableSkillCatalog = enable;
             return this;
@@ -171,6 +198,7 @@ public class SystemContextBuilder {
         }
         sb.append(basePrompt);
 
+<<<<<<< HEAD
         // 2. 注入对话摘要（新增）
         if (config.getSessionId() != null) {
             String summaryContext = buildConversationSummary(config);
@@ -190,6 +218,19 @@ public class SystemContextBuilder {
         }
 
         // 4. 注入知识图谱
+=======
+        // 2. 注入用户画像
+        if (config.isEnableUserProfile() && config.getUserId() != null) {
+            String profileContext = buildUserProfileContext(config);
+            if (profileContext != null && !profileContext.isEmpty()) {
+                sb.append("\n\n").append(profileContext);
+                result.setUserProfileLength(profileContext.length());
+                log.debug("[userId={}] 注入用户画像（{} 字符）", config.getUserId(), profileContext.length());
+            }
+        }
+
+        // 3. 注入知识图谱
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (config.isEnableKnowledgeGraph() && config.getUserId() != null && config.getSessionId() != null) {
             String graphContext = buildKnowledgeGraphContext(config);
             if (graphContext != null && !graphContext.isEmpty()) {
@@ -200,7 +241,11 @@ public class SystemContextBuilder {
             }
         }
 
+<<<<<<< HEAD
         // 5. 注入技能目录
+=======
+        // 4. 注入技能目录
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (config.isEnableSkillCatalog()) {
             String skillCatalog = buildSkillCatalog(config);
             if (skillCatalog != null && !skillCatalog.isEmpty()) {
@@ -210,6 +255,7 @@ public class SystemContextBuilder {
             }
         }
 
+<<<<<<< HEAD
         // 6. 注入任务状态（新增）
         if (config.getSessionId() != null) {
             String taskStatusContext = buildTaskStatus(config);
@@ -223,12 +269,19 @@ public class SystemContextBuilder {
         appendSessionFileContext(sb, config.getSessionId());
 
         // 8. 工具列表提示（仅MCP模式）
+=======
+        // 5. 工具列表提示（仅MCP模式）
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (config.isEnableToolList()) {
             sb.append("\n\n## 🔧 可用工具\n");
             sb.append("工具详细参数已通过 API 传递，按需调用即可。格式: `server__tool_name`\n");
         }
 
+<<<<<<< HEAD
         // 9. 检查并截断
+=======
+        // 6. 检查并截断
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         String finalPrompt = sb.toString();
         result.setTotalLength(finalPrompt.length());
 
@@ -247,6 +300,7 @@ public class SystemContextBuilder {
     }
 
     /**
+<<<<<<< HEAD
      * 构建对话摘要上下文
      */
     private String buildConversationSummary(BuildConfig config) {
@@ -342,11 +396,27 @@ public class SystemContextBuilder {
             if (context != null && context.length() > MAX_MEMORY_PALACE_LENGTH) {
                 context = context.substring(0, MAX_MEMORY_PALACE_LENGTH) + "\n...(更多记忆已省略)\n```\n";
                 log.debug("[userId={}] 记忆宫殿已截断至 {} 字符", config.getUserId(), MAX_MEMORY_PALACE_LENGTH);
+=======
+     * 构建用户画像上下文
+     */
+    private String buildUserProfileContext(BuildConfig config) {
+        try {
+            String context = userProfileService.generateUserProfileContextForLLM(
+                config.getUserId(), config.getUserMessage());
+
+            if (context != null && context.length() > MAX_USER_PROFILE_LENGTH) {
+                context = context.substring(0, MAX_USER_PROFILE_LENGTH) + "\n...(更多画像信息已省略)\n```\n";
+                log.debug("[userId={}] 用户画像已截断至 {} 字符", config.getUserId(), MAX_USER_PROFILE_LENGTH);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
 
             return context;
         } catch (Exception e) {
+<<<<<<< HEAD
             log.warn("[userId={}] 构建记忆宫殿上下文失败：{}", config.getUserId(), e.getMessage());
+=======
+            log.warn("[userId={}] 构建用户画像上下文失败：{}", config.getUserId(), e.getMessage());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return null;
         }
     }
@@ -391,6 +461,7 @@ public class SystemContextBuilder {
     }
 
     /**
+<<<<<<< HEAD
      * 构建工具选择指南（精简版）
      */
     private String buildToolSelectionGuide() {
@@ -464,11 +535,34 @@ public class SystemContextBuilder {
         sb.append("- **run_skill_script**: 用于执行技能脚本，自动处理环境配置和文件发送\n");
         sb.append("- **bash-sandbox__execute**: 用于通用命令，需手动导出和发送文件\n");
         sb.append("- **工具名格式**: MCP工具使用 `server__tool_name`（双下划线）\n");
+=======
+     * 构建工具选择指南
+     */
+    private String buildToolSelectionGuide() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("## 🔧 工具选择指南\n\n");
+        sb.append("### Skills 工具（优先使用）\n");
+        sb.append("- 任务涉及文档生成（Word、PDF、Excel）→ 使用 minimax-docx/minimax-pdf/minimax-xlsx\n");
+        sb.append("- 任务涉及设计或前端开发 → 使用 canvas-design/frontend-design\n");
+        sb.append("- 调用流程：load_skill → read_skill_resource(可选) → run_skill_script\n\n");
+        sb.append("### bash-sandbox 工具\n");
+        sb.append("- 需要执行通用 shell 命令\n");
+        sb.append("- 需要会话状态保持（多个相关命令）\n");
+        sb.append("- 工具名格式：bash-sandbox__execute\n\n");
+        sb.append("### 重要提示\n");
+        sb.append("- run_skill_script: 执行 Skills 脚本，输出文件自动发送给用户\n");
+        sb.append("- bash-sandbox__execute: 执行通用命令，生成文件后需调用 send_file 发送\n");
+        sb.append("- 所有脚本都在安全的沙箱环境中执行\n\n");
+
+        // 添加沙箱环境信息
+        sb.append(buildSandboxEnvironmentInfo());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         return sb.toString();
     }
 
     /**
+<<<<<<< HEAD
      * 追加会话文件状态到系统提示
      * 让 AI 知道当前会话中有哪些文件可用（包括上传的和生成的）
      */
@@ -532,6 +626,48 @@ public class SystemContextBuilder {
      */
     private String buildSandboxEnvironmentInfo() {
         return "";  // 已整合到 buildToolSelectionGuide 中
+=======
+     * 构建沙箱环境信息
+     * 让大模型知道文件在哪里、如何与其他工具协作
+     */
+    private String buildSandboxEnvironmentInfo() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("## 📂 沙箱环境\n\n");
+
+        sb.append("### 核心概念\n");
+        sb.append("1. **会话 (Session)**: 每个会话有独立的工作目录，命令在会话中执行\n");
+        sb.append("2. **共享目录**: 所有会话都可以访问，用于跨工具文件共享\n");
+        sb.append("3. **导出文件**: 将沙箱内文件导出到共享目录，供其他工具访问\n\n");
+
+        sb.append("### 工具使用模式\n");
+        sb.append("```\n");
+        sb.append("# 模式1: Skills 脚本（推荐）\n");
+        sb.append("load_skill(skill_name=\"minimax-docx\")  # 获取脚本路径和参数说明\n");
+        sb.append("run_skill_script(skill_name=\"minimax-docx\", script_name=\"scripts/create.py\", parameters={...})\n");
+        sb.append("# 输出文件自动发送给用户\n\n");
+
+        sb.append("# 模式2: 通用命令 + 手动发送文件\n");
+        sb.append("result = bash-sandbox__execute(command=\"python generate_image.py\")\n");
+        sb.append("# result 包含: sessionId, workingDirectory, stdout, stderr\n");
+        sb.append("# 步骤1: 导出文件到共享目录\n");
+        sb.append("bash-sandbox__export_file(sourcePath=\"output.png\")\n");
+        sb.append("# 步骤2: 发送文件给用户\n");
+        sb.append("send_file(file_path=\"共享目录路径/output.png\")\n\n");
+
+        sb.append("# 模式3: 文件导出（跨工具协作）\n");
+        sb.append("bash-sandbox__execute(command=\"echo hello > output.txt\")\n");
+        sb.append("bash-sandbox__export_file(sourcePath=\"output.txt\")  # 导出到共享目录\n");
+        sb.append("# 然后其他工具可以访问共享目录中的文件\n");
+        sb.append("```\n\n");
+
+        sb.append("### 重要提示\n");
+        sb.append("- **run_skill_script**: 自动处理文件发送，适合文档生成等任务\n");
+        sb.append("- **bash-sandbox__execute**: 适合通用命令，需要手动导出文件\n");
+        sb.append("- **会话复用**: 使用返回的 sessionId 保持命令间的状态\n");
+        sb.append("- **路径处理**: 使用相对路径，或使用返回的 workingDirectory 作为基准\n");
+
+        return sb.toString();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     /**

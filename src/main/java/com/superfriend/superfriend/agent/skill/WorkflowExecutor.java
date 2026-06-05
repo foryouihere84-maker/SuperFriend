@@ -10,10 +10,15 @@ import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+<<<<<<< HEAD
+=======
+import java.util.concurrent.*;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 @Slf4j
 @Service
 public class WorkflowExecutor {
+<<<<<<< HEAD
 
     @Autowired
     private SkillExecutor skillExecutor;
@@ -23,6 +28,18 @@ public class WorkflowExecutor {
 
     private final ExpressionParser expressionParser = new SpelExpressionParser();
 
+=======
+    
+    @Autowired
+    private SkillExecutor skillExecutor;
+    
+    @Autowired
+    private SkillRegistry skillRegistry;
+    
+    private final ExpressionParser expressionParser = new SpelExpressionParser();
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public WorkflowResult execute(SkillWorkflow workflow, SkillContext baseContext) {
         long startTime = System.currentTimeMillis();
         String workflowId = workflow.getWorkflowId() != null ? 

@@ -69,12 +69,16 @@ public class OfficeParser implements FileParser {
                 }
                 String type = parts[0];
                 String fileName = parts[1];
+<<<<<<< HEAD
                 // 检查文件名是否为空
                 if (fileName == null || fileName.trim().isEmpty()) {
                     return ParseResult.failed("temp:// URL 中文件名为空: " + fileUrl);
                 }
                 java.nio.file.Path localPath = java.nio.file.Paths.get("uploads", "temp", type, fileName);
                 log.debug("解析 temp:// URL: {} -> {}", fileUrl, localPath.toAbsolutePath());
+=======
+                java.nio.file.Path localPath = java.nio.file.Paths.get("uploads", "temp", type, fileName);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 inputStream = new FileInputStream(localPath.toFile());
             } else {
                 inputStream = new FileInputStream(fileUrl);

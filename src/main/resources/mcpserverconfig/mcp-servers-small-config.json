@@ -8,6 +8,17 @@
       "timeout": 60000,
       "description": "【文件系统工具】官方文件操作服务，支持读写文件、创建目录、列出目录、搜索文件等。已包含沙箱共享目录访问权限。"
     },
+<<<<<<< HEAD
+=======
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {},
+      "disabled": false,
+      "timeout": 60000,
+      "description": "【知识图谱工具】官方知识图谱服务，用于存储结构化知识数据。"
+    },
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     "sequentialthinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
@@ -17,16 +28,26 @@
       "description": "【顺序思考工具】官方思维链服务，支持动态和反思性问题解决。"
     },
     "fetch": {
+<<<<<<< HEAD
       "command": "python",
       "args": ["-m", "mcp_server_fetch", "--ignore-robots-txt"],
+=======
+      "command": "uvx",
+      "args": ["mcp-server-fetch", "--ignore-robots-txt"],
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
       "env": {},
       "disabled": false,
       "timeout": 60000,
       "description": "【网络请求工具】官方 HTTP 请求服务，支持网页内容抓取、API 调用等。"
     },
     "time": {
+<<<<<<< HEAD
       "command": "python",
       "args": ["-m", "mcp_server_time"],
+=======
+      "command": "uvx",
+      "args": ["mcp-server-time"],
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
       "env": {},
       "disabled": false,
       "timeout": 30000,

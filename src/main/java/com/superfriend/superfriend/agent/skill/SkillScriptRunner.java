@@ -23,11 +23,18 @@ import java.util.regex.Pattern;
  * 技能脚本执行器
  * 通过 bash-sandbox 执行技能脚本，统一执行环境
  *
+<<<<<<< HEAD
  * 提供功能：
  * 1. 统一的沙箱执行环境
  * 2. 会话状态保持
  * 3. 文件生命周期管理
  * 4. 多种执行器类型支持（script/command）
+=======
+ * 替代原有的 ScriptExecutor，提供：
+ * 1. 统一的沙箱执行环境
+ * 2. 会话状态保持
+ * 3. 文件生命周期管理
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
  */
 @Slf4j
 @Service
@@ -41,6 +48,7 @@ public class SkillScriptRunner {
     private final ObjectMapper objectMapper;
 
     /**
+<<<<<<< HEAD
      * 默认脚本执行超时时间（毫秒）- 可通过配置覆盖
      */
     @org.springframework.beans.factory.annotation.Value("${skill.executor.default-timeout-ms:300000}")
@@ -87,6 +95,20 @@ public class SkillScriptRunner {
         DEFAULT_SCRIPT_EXECUTORS.put("csx", "dotnet script");
     }
 
+=======
+     * 默认脚本执行超时时间（毫秒）
+     */
+    private static final long DEFAULT_TIMEOUT_MS = 300000; // 5 分钟
+
+    /**
+     * 文件路径检测正则表达式
+     */
+    private static final Pattern FILE_PATH_PATTERN = Pattern.compile(
+        "([a-zA-Z]:[\\\\/][^\\s]+|/[^\\s]+\\.(docx|pdf|xlsx|pptx|png|jpg|jpeg|gif|mp4|mp3|zip|json|txt|md))",
+        Pattern.CASE_INSENSITIVE
+    );
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Autowired
     public SkillScriptRunner(BashSandboxService bashSandboxService,
                               SkillSandboxSessionManager sessionManager,
@@ -120,7 +142,11 @@ public class SkillScriptRunner {
      * 执行技能脚本
      *
      * @param skillName   技能名称
+<<<<<<< HEAD
      * @param scriptName  脚本名称（相对于 scripts 目录）或 CLI 子命令
+=======
+     * @param scriptName  脚本名称（相对于 scripts 目录）
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * @param parameters  参数
      * @param sessionId   会话 ID（可选，如果不提供则使用技能专用会话）
      * @return 执行结果
@@ -133,15 +159,22 @@ public class SkillScriptRunner {
         log.info("开始执行技能脚本: skill={}, script={}, sessionId={}", skillName, scriptName, sessionId);
 
         String paramFilePath = null;
+<<<<<<< HEAD
         String outputDir = null;
 
         try {
             // 1. 获取技能路径和配置
+=======
+
+        try {
+            // 1. 获取技能路径
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             String skillPath = skillRegistry.getSkillBasePath(skillName);
             if (skillPath == null) {
                 skillPath = filePathConfig.getSkillsDir() + "/" + skillName;
             }
 
+<<<<<<< HEAD
             // 获取技能配置
             Skill skill = skillRegistry.getSkill(skillName);
             SkillConfig.ExecutorConfig executorConfig = null;
@@ -262,11 +295,41 @@ public class SkillScriptRunner {
                 workingDir,
                 timeout,
                 env
+=======
+            // 2. 构建脚本完整路径
+            String scriptPath = buildScriptPath(skillPath, scriptName);
+            if (!Files.exists(Paths.get(scriptPath))) {
+                return ScriptExecutionResult.failure("脚本文件不存在: " + scriptPath);
+            }
+
+            // 3. 获取或创建会话
+            String effectiveSessionId = sessionId;
+            if (effectiveSessionId == null || effectiveSessionId.isEmpty()) {
+                effectiveSessionId = sessionManager.getOrCreateSession(skillName, skillPath);
+            }
+
+            // 4. 创建参数文件
+            if (parameters != null && !parameters.isEmpty()) {
+                paramFilePath = createParameterFile(parameters, skillPath);
+            }
+
+            // 5. 构建执行命令
+            String command = buildCommand(scriptPath, paramFilePath, parameters);
+
+            // 6. 通过 bash-sandbox 执行
+            BashSandboxService.ExecuteResult executeResult = bashSandboxService.execute(
+                effectiveSessionId,
+                command,
+                skillPath,  // 工作目录设为技能目录
+                DEFAULT_TIMEOUT_MS,
+                buildEnvironmentVariables(parameters)
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             ).join();
 
             // 7. 清理参数文件
             if (paramFilePath != null) {
                 cleanupParameterFile(paramFilePath);
+<<<<<<< HEAD
                 paramFilePath = null;
             }
 
@@ -308,13 +371,28 @@ public class SkillScriptRunner {
                 }
 
                 List<String> outputFiles = detectOutputFiles(result.getOutput(), searchDirs);
+=======
+                paramFilePath = null;  // 标记已清理
+            }
+
+            // 8. 转换结果
+            ScriptExecutionResult result = convertResult(executeResult, scriptPath);
+            result.setExecutionTime(System.currentTimeMillis() - startTime);
+
+            // 9. 检测并注册输出文件
+            if (result.isSuccess()) {
+                List<String> outputFiles = detectOutputFiles(result.getOutput(), skillPath);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 result.setOutputFiles(outputFiles);
 
                 for (String filePath : outputFiles) {
                     fileLifecycleManager.registerFile(filePath, "skill:" + skillName, effectiveSessionId);
                 }
+<<<<<<< HEAD
 
                 log.info("检测到输出文件: files={}, searchDirs={}", outputFiles.size(), searchDirs);
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
 
             log.info("技能脚本执行完成: skill={}, script={}, success={}, time={}ms, outputFiles={}",
@@ -326,7 +404,11 @@ public class SkillScriptRunner {
         } catch (Exception e) {
             log.error("技能脚本执行失败: skill={}, script={} - {}", skillName, scriptName, e.getMessage(), e);
 
+<<<<<<< HEAD
             // 清理可能遗留的文件
+=======
+            // 清理可能遗留的参数文件
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             if (paramFilePath != null) {
                 try {
                     cleanupParameterFile(paramFilePath);
@@ -335,6 +417,7 @@ public class SkillScriptRunner {
                     log.warn("清理参数文件失败: {} - {}", paramFilePath, cleanupEx.getMessage());
                 }
             }
+<<<<<<< HEAD
             if (outputDir != null) {
                 try {
                     cleanupOutputDirectory(outputDir);
@@ -343,6 +426,8 @@ public class SkillScriptRunner {
                     log.warn("清理输出目录失败: {} - {}", outputDir, cleanupEx.getMessage());
                 }
             }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
             ScriptExecutionResult result = ScriptExecutionResult.failure("执行失败: " + e.getMessage());
             result.setExecutionTime(System.currentTimeMillis() - startTime);
@@ -351,6 +436,7 @@ public class SkillScriptRunner {
     }
 
     /**
+<<<<<<< HEAD
      * 构建执行器命令
      */
     private String buildExecutorCommand(SkillConfig.ExecutorConfig executor, String skillPath,
@@ -584,6 +670,8 @@ public class SkillScriptRunner {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 构建脚本路径
      */
     private String buildScriptPath(String skillPath, String scriptName) {
@@ -623,12 +711,17 @@ public class SkillScriptRunner {
     }
 
     /**
+<<<<<<< HEAD
      * 构建执行命令（传统脚本方式）
+=======
+     * 构建执行命令
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      */
     private String buildCommand(String scriptPath, String paramFilePath, Map<String, Object> parameters) {
         String extension = getFileExtension(scriptPath);
         StringBuilder command = new StringBuilder();
 
+<<<<<<< HEAD
         // 使用配置的默认执行器，或回退到硬编码默认值
         String executor = DEFAULT_SCRIPT_EXECUTORS.getOrDefault(extension.toLowerCase(), "");
 
@@ -643,12 +736,51 @@ public class SkillScriptRunner {
             if (paramFilePath != null) {
                 command.append(" \"").append(paramFilePath).append("\"");
             }
+=======
+        switch (extension.toLowerCase()) {
+            case "py":
+                command.append("python -u \"").append(scriptPath).append("\"");
+                if (paramFilePath != null) {
+                    command.append(" --param-file \"").append(paramFilePath).append("\"");
+                }
+                break;
+
+            case "sh":
+                command.append("bash \"").append(scriptPath).append("\"");
+                if (paramFilePath != null) {
+                    command.append(" \"").append(paramFilePath).append("\"");
+                }
+                break;
+
+            case "js":
+            case "ts":
+                command.append("node \"").append(scriptPath).append("\"");
+                if (paramFilePath != null) {
+                    command.append(" --param-file \"").append(paramFilePath).append("\"");
+                }
+                break;
+
+            case "csx":
+                command.append("dotnet script \"").append(scriptPath).append("\"");
+                if (paramFilePath != null) {
+                    command.append(" --param-file \"").append(paramFilePath).append("\"");
+                }
+                break;
+
+            default:
+                // 尝试直接执行
+                command.append("\"").append(scriptPath).append("\"");
+                if (paramFilePath != null) {
+                    command.append(" \"").append(paramFilePath).append("\"");
+                }
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
 
         return command.toString();
     }
 
     /**
+<<<<<<< HEAD
      * 创建唯一输出目录
      * 每个会话有独立的输出目录，避免文件冲突
      */
@@ -748,6 +880,13 @@ public class SkillScriptRunner {
         env.put("SESSION_ID", sessionId);
 
         // 注入用户参数
+=======
+     * 构建环境变量
+     */
+    private Map<String, String> buildEnvironmentVariables(Map<String, Object> parameters) {
+        Map<String, String> env = new HashMap<>();
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (parameters != null) {
             parameters.forEach((key, value) -> {
                 env.put("SKILL_PARAM_" + key.toUpperCase(), String.valueOf(value));
@@ -758,6 +897,7 @@ public class SkillScriptRunner {
     }
 
     /**
+<<<<<<< HEAD
      * 构建环境变量（兼容旧方法）
      */
     private Map<String, String> buildEnvironmentVariables(Map<String, Object> parameters) {
@@ -765,6 +905,8 @@ public class SkillScriptRunner {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 转换执行结果
      */
     private ScriptExecutionResult convertResult(BashSandboxService.ExecuteResult executeResult, String scriptPath) {
@@ -792,6 +934,7 @@ public class SkillScriptRunner {
     }
 
     /**
+<<<<<<< HEAD
      * 检测输出文件（多目录扫描版本）
      *
      * 优先级策略（从快到慢）：
@@ -847,10 +990,37 @@ public class SkillScriptRunner {
             for (String dir : searchDirs) {
                 if (dir != null) {
                     detectOutputFilesInDirectory(dir, files);
+=======
+     * 检测输出文件
+     */
+    private List<String> detectOutputFiles(String output, String workingDir) {
+        List<String> files = new ArrayList<>();
+
+        if (output == null || output.isEmpty()) {
+            return files;
+        }
+
+        // 1. 尝试从 JSON 输出中提取文件路径
+        try {
+            Map<String, Object> parsedOutput = objectMapper.readValue(output, Map.class);
+            extractFilePathsFromMap(parsedOutput, files, workingDir);
+        } catch (Exception e) {
+            // 不是 JSON，使用正则表达式匹配
+        }
+
+        // 2. 使用正则表达式匹配文件路径
+        if (files.isEmpty()) {
+            Matcher matcher = FILE_PATH_PATTERN.matcher(output);
+            while (matcher.find()) {
+                String filePath = matcher.group(1);
+                if (Files.exists(Paths.get(filePath))) {
+                    files.add(filePath);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 }
             }
         }
 
+<<<<<<< HEAD
         if (!files.isEmpty()) {
             log.info("从多个目录中检测到文件: {}", files);
         }
@@ -916,6 +1086,34 @@ public class SkillScriptRunner {
                 .filter(path -> {
                     String name = path.getFileName().toString().toLowerCase();
                     for (String ext : DEFAULT_OUTPUT_EXTENSIONS) {
+=======
+        // 3. 检查工作目录中是否有新生成的常见输出文件
+        if (files.isEmpty()) {
+            detectNewOutputFiles(workingDir, files);
+        }
+
+        return files;
+    }
+
+    /**
+     * 检测工作目录中新生成的输出文件
+     */
+    private void detectNewOutputFiles(String workingDir, List<String> files) {
+        try {
+            Path workPath = Paths.get(workingDir);
+            if (!Files.exists(workPath)) {
+                return;
+            }
+
+            // 常见输出文件扩展名
+            String[] outputExtensions = {".docx", ".pdf", ".xlsx", ".pptx", ".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mp3", ".zip", ".json"};
+
+            Files.walk(workPath, 2)  // 最多深度2层
+                .filter(Files::isRegularFile)
+                .filter(path -> {
+                    String name = path.getFileName().toString().toLowerCase();
+                    for (String ext : outputExtensions) {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                         if (name.endsWith(ext)) {
                             return true;
                         }
@@ -923,6 +1121,7 @@ public class SkillScriptRunner {
                     return false;
                 })
                 .filter(path -> {
+<<<<<<< HEAD
                     String name = path.getFileName().toString();
                     return !name.startsWith("skill_params_") && !name.startsWith("~$");
                 })
@@ -983,6 +1182,20 @@ public class SkillScriptRunner {
             }
         }
         return newFiles;
+=======
+                    // 排除临时文件和参数文件
+                    String name = path.getFileName().toString();
+                    return !name.startsWith("skill_params_") && !name.startsWith("~$");
+                })
+                .forEach(path -> files.add(path.toString()));
+
+            if (!files.isEmpty()) {
+                log.info("检测到工作目录中的输出文件: {}", files);
+            }
+        } catch (Exception e) {
+            log.debug("检测工作目录输出文件失败: {}", e.getMessage());
+        }
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     /**
@@ -1061,8 +1274,11 @@ public class SkillScriptRunner {
         private Map<String, Object> parsedOutput;
         /** 输出文件列表 */
         private List<String> outputFiles;
+<<<<<<< HEAD
         /** 输出目录路径 */
         private String outputDirectory;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         public static ScriptExecutionResult success(String output) {
             ScriptExecutionResult result = new ScriptExecutionResult();

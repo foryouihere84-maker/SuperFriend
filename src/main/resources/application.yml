@@ -35,7 +35,11 @@ mybatis:
     map-underscore-to-camel-case: true
 
 jwt:
+<<<<<<< HEAD
   secret: superfriend-secret-key-2024-very-long-key-for-jwt-token-generation-must-be-at-least-256-bits-long
+=======
+  secret: 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
   expiration: 604800000
 
 
@@ -177,8 +181,11 @@ news:
     time-range: day
     # 搜索关键词（逗号分隔）
     queries: AI 人工智能,科技新闻,互联网热点
+<<<<<<< HEAD
     # 指定搜索引擎（可选），如 "bing news"，留空则使用默认引擎
     engines:
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 # 腾讯云 COS 配置
 tencent:
@@ -203,7 +210,11 @@ node-enrichment:
 zhipu:
   api:
     enabled: true
+<<<<<<< HEAD
     key: your_api_key
+=======
+    key: your-key
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
   image:
     model: cogview-4
     default-size: 1024x1024
@@ -258,8 +269,11 @@ bash-sandbox:
   resource-reserve-ratio: 0.2
   # 会话超时时间（毫秒），默认 30 分钟
   session-timeout-ms: 1800000
+<<<<<<< HEAD
   # 会话文件延迟清理时间（毫秒），对话结束后保留文件一段时间再删除，默认 30 分钟
   session-cleanup-delay-ms: 1800000
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
   # 最大命令长度
   max-command-length: 8192
   # 最大输出大小（字节），默认 10MB
@@ -267,4 +281,8 @@ bash-sandbox:
   # 是否在 Windows 上禁用沙箱
   disable-on-windows: false
   # MCP Server 名称
+<<<<<<< HEAD
   mcp-server-name: bash-sandbox
+=======
+  mcp-server-name: bash-sandbox
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2

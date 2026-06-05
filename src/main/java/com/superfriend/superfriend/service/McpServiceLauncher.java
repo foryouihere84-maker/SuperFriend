@@ -173,6 +173,7 @@ public class McpServiceLauncher {
             return config;
         }
 
+<<<<<<< HEAD
         // 自动检测系统可用的 Python 命令
         String pythonCommand = detectPythonCommand();
         log.info("[{}] 检测到 Python 命令: {}", serverName, pythonCommand);
@@ -180,6 +181,11 @@ public class McpServiceLauncher {
         // 替换路径占位符
         McpServerConfig newConfig = new McpServerConfig();
         newConfig.setCommand(pythonCommand);
+=======
+        // 替换路径占位符
+        McpServerConfig newConfig = new McpServerConfig();
+        newConfig.setCommand(config.getCommand());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         newConfig.setArgs(Arrays.stream(args)
             .map(this::replacePlaceholders)
             .toArray(String[]::new));
@@ -192,6 +198,7 @@ public class McpServiceLauncher {
     }
 
     /**
+<<<<<<< HEAD
      * 检测系统可用的 Python 命令
      * 优先级：python3 > python
      */
@@ -244,6 +251,8 @@ public class McpServiceLauncher {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 查找本地安装的 npm 包
      */
     private String findLocalNpmPackage(String packageName) {

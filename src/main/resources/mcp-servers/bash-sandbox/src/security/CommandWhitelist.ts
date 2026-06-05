@@ -873,6 +873,7 @@ export const WINDOWS_COMMANDS: Set<string> = new Set([
 export function isCommandAllowed(command: string, isWindows: boolean): boolean {
     if (isWindows) {
         const cmd = command.toLowerCase().split(/\s+/)[0];
+<<<<<<< HEAD
         // Windows: 如果命令在白名单中，允许
         if (WINDOWS_COMMANDS.has(cmd)) {
             return true;
@@ -890,6 +891,12 @@ export function isCommandAllowed(command: string, isWindows: boolean): boolean {
 
     const mainCommand = extractMainCommand(command);
     const commandName = path.basename(mainCommand);
+=======
+        return WINDOWS_COMMANDS.has(cmd);
+    }
+
+    const mainCommand = extractMainCommand(command);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
     // 检查完整路径
     if (ALL_ALLOWED_LINUX.has(mainCommand)) {
@@ -897,6 +904,10 @@ export function isCommandAllowed(command: string, isWindows: boolean): boolean {
     }
 
     // 检查命令名（basename）
+<<<<<<< HEAD
+=======
+    const commandName = path.basename(mainCommand);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     if (LINUX_COMMAND_NAMES.has(commandName)) {
         return true;
     }
@@ -906,6 +917,7 @@ export function isCommandAllowed(command: string, isWindows: boolean): boolean {
         return true;
     }
 
+<<<<<<< HEAD
     // 【新增】Git Bash 环境特殊处理
     // Git Bash 常见路径前缀
     const gitBashPrefixes = [
@@ -955,6 +967,8 @@ export function isCommandAllowed(command: string, isWindows: boolean): boolean {
         return true;
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     return false;
 }
 

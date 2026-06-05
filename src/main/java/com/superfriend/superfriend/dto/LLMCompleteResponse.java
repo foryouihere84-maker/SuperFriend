@@ -49,11 +49,14 @@ public class LLMCompleteResponse {
                     com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
                     return mapper.readValue(argumentsStr, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
                 } catch (Exception e) {
+<<<<<<< HEAD
                     // 记录解析失败的原因，便于调试
                     System.err.println("[ToolCall] JSON 解析 argumentsStr 失败: " + e.getMessage());
                     System.err.println("[ToolCall] argumentsStr 长度: " + argumentsStr.length());
                     System.err.println("[ToolCall] argumentsStr 前200字符: " +
                         (argumentsStr.length() > 200 ? argumentsStr.substring(0, 200) : argumentsStr));
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     return new java.util.HashMap<>();
                 }
             }

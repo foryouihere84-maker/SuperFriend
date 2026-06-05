@@ -7,10 +7,14 @@ import org.springframework.core.task.TaskExecutor;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
+<<<<<<< HEAD
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+=======
+import java.util.concurrent.ThreadPoolExecutor;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
 @Configuration
 @EnableAsync
@@ -31,6 +35,7 @@ public class AsyncConfig {
     @Value("${spring.task.execution.thread-name-prefix:sf-async-}")
     private String threadNamePrefix;
 
+<<<<<<< HEAD
     @Value("${app.executor.parallel.core-size:6}")
     private int parallelCoreSize;
 
@@ -43,6 +48,8 @@ public class AsyncConfig {
     @Value("${app.executor.script.queue-capacity:50}")
     private int scriptQueueCapacity;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Bean(name = "asyncTaskExecutor")
     public TaskExecutor asyncTaskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
@@ -56,6 +63,7 @@ public class AsyncConfig {
         return executor;
     }
 
+<<<<<<< HEAD
     @Bean(name = "parallelToolExecutor")
     public ExecutorService parallelToolExecutor() {
         return new ThreadPoolExecutor(
@@ -92,6 +100,8 @@ public class AsyncConfig {
         return executor;
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private int parseKeepAlive(String keepAlive) {
         if (keepAlive.endsWith("s")) {
             return Integer.parseInt(keepAlive.substring(0, keepAlive.length() - 1));

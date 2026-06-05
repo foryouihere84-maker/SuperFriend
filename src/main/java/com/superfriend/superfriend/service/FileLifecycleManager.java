@@ -2,7 +2,10 @@ package com.superfriend.superfriend.service;
 
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+<<<<<<< HEAD
 import org.springframework.scheduling.annotation.Scheduled;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PreDestroy;
@@ -295,6 +298,7 @@ public class FileLifecycleManager {
     }
 
     /**
+<<<<<<< HEAD
      * 定时清理过期文件（每小时执行）
      * 清理已发送且超过 TTL 的文件
      */
@@ -308,6 +312,8 @@ public class FileLifecycleManager {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 应用关闭时清理
      */
     @PreDestroy

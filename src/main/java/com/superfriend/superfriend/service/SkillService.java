@@ -245,7 +245,16 @@ public class SkillService {
     }
     
     // ==================== 执行历史管理 ====================
+<<<<<<< HEAD
 
+=======
+    
+    public SkillExecution addExecution(SkillExecution execution) {
+        skillExecutionMapper.insert(execution);
+        return execution;
+    }
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public void deleteExecution(Long id) {
         skillExecutionMapper.deleteById(id);
     }
@@ -257,7 +266,23 @@ public class SkillService {
     public void deleteExecutionsByUserId(Long userId) {
         skillExecutionMapper.deleteByUserId(userId);
     }
+<<<<<<< HEAD
 
+=======
+    
+    public List<SkillExecution> findExecutionsBySkillId(Long skillId) {
+        return skillExecutionMapper.findBySkillId(skillId);
+    }
+    
+    public List<SkillExecution> findExecutionsByUserId(Long userId) {
+        return skillExecutionMapper.findByUserId(userId);
+    }
+    
+    public List<SkillExecution> findExecutionsBySessionId(String sessionId) {
+        return skillExecutionMapper.findBySessionId(sessionId);
+    }
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     // ==================== 统计信息 ====================
     
     public void updateSkillStatistics(Long skillId, Double successRate, Integer averageExecutionTime) {

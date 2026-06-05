@@ -180,6 +180,7 @@ public static class CreateCommand
             body.Append(sectPr);
 
             mainPart.Document.Save();
+<<<<<<< HEAD
 
             // Output standardized JSON for system to detect output file
             Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(new
@@ -188,6 +189,9 @@ public static class CreateCommand
                 outputFile = Path.GetFullPath(output),
                 message = $"Created {docType} document"
             }));
+=======
+            Console.WriteLine($"Created {docType} document: {output}");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         });
 
         return cmd;

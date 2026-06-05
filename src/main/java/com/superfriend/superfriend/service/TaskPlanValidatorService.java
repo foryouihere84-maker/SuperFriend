@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.*;
+<<<<<<< HEAD
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -23,6 +24,9 @@ import java.util.regex.Pattern;
  * 2. 规则验证层（中速、较可靠、无成本）
  * 3. LLM 验证层（慢速、需成本、高智能）
  */
+=======
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 @Slf4j
 @Service
 public class TaskPlanValidatorService {
@@ -37,8 +41,11 @@ public class TaskPlanValidatorService {
     @Autowired
     private RestTemplate restTemplate;
 
+<<<<<<< HEAD
     // ==================== 数据结构定义 ====================
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Data
     public static class StepValidationContext {
         private String stepDescription;
@@ -50,8 +57,11 @@ public class TaskPlanValidatorService {
         private int stepNumber;
         private int totalSteps;
         private String originalRequest;
+<<<<<<< HEAD
         private List<String> previousStepResults;  // 新增：前序步骤结果
         private int retryCount;  // 新增：当前重试次数
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     @Data
@@ -63,13 +73,17 @@ public class TaskPlanValidatorService {
         private List<String> suggestedFixes;
         private String adjustedStepDescription;
         private List<String> additionalStepsNeeded;
+<<<<<<< HEAD
         private ValidationLevel validationLevel;  // 新增：验证层级
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         public enum ValidationAction {
             CONTINUE,
             RETRY_STEP,
             SKIP_STEP,
             ADJUST_PLAN,
+<<<<<<< HEAD
             ABORT_PLAN,
             FORCE_CONTINUE  // 新增：强制继续（低置信度但无更好选择）
         }
@@ -78,6 +92,9 @@ public class TaskPlanValidatorService {
             DETERMINISTIC,  // 确定性验证
             RULE_BASED,     // 规则验证
             LLM_BASED       // LLM 验证
+=======
+            ABORT_PLAN
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
     }
 
@@ -97,6 +114,7 @@ public class TaskPlanValidatorService {
         }
     }
 
+<<<<<<< HEAD
     // 新增：整体任务验证结果
     @Data
     public static class TaskCompletionResult {
@@ -185,12 +203,34 @@ public class TaskPlanValidatorService {
         if (context.getErrorMessage() != null && !context.getErrorMessage().isEmpty()) {
             result.setValid(false);
             result.setConfidenceScore(1.0);
+=======
+    public StepValidationResult validateStepResult(StepValidationContext context, String model, Long userId) {
+        StepValidationResult result = new StepValidationResult();
+        result.setValid(true);
+        result.setConfidenceScore(1.0);
+        result.setAction(StepValidationResult.ValidationAction.CONTINUE);
+        result.setSuggestedFixes(new ArrayList<>());
+
+        if (context.getActualResult() == null || context.getActualResult().trim().isEmpty()) {
+            result.setValid(false);
+            result.setConfidenceScore(0.0);
+            result.setReason("步骤结果为空");
+            result.setAction(StepValidationResult.ValidationAction.RETRY_STEP);
+            result.getSuggestedFixes().add("重新执行该步骤");
+            return result;
+        }
+
+        if (context.getErrorMessage() != null && !context.getErrorMessage().isEmpty()) {
+            result.setValid(false);
+            result.setConfidenceScore(0.3);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             result.setReason("步骤执行出错: " + context.getErrorMessage());
             result.setAction(determineActionFromError(context.getErrorMessage()));
             result.getSuggestedFixes().add("检查错误原因并修复");
             return result;
         }
 
+<<<<<<< HEAD
         // 3. 工具调用失败检查
         if (context.getToolUsed() != null && !context.getToolUsed().isEmpty() && !context.isToolSuccess()) {
             result.setValid(false);
@@ -357,6 +397,29 @@ public class TaskPlanValidatorService {
 
     // ==================== 第三层：LLM 验证 ====================
 
+=======
+        if (context.getToolUsed() != null && !context.getToolUsed().isEmpty() && !context.isToolSuccess()) {
+            result.setValid(false);
+            result.setConfidenceScore(0.4);
+            result.setReason("工具调用失败: " + context.getToolUsed());
+            result.setAction(StepValidationResult.ValidationAction.RETRY_STEP);
+            result.getSuggestedFixes().add("尝试使用替代工具");
+            return result;
+        }
+
+        try {
+            StepValidationResult llmResult = validateWithLLM(context, model, userId);
+            if (llmResult != null) {
+                return llmResult;
+            }
+        } catch (Exception e) {
+            log.warn("LLM 验证失败，使用规则验证: {}", e.getMessage());
+        }
+
+        return result;
+    }
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private StepValidationResult validateWithLLM(StepValidationContext context, String model, Long userId) {
         try {
             AIModelConfigService.ResolvedConfig config = modelConfigService.resolveModelConfigWithKey(model, userId);
@@ -368,29 +431,45 @@ public class TaskPlanValidatorService {
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", config.getModelId());
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             List<Map<String, String>> messages = new ArrayList<>();
             Map<String, String> systemMsg = new HashMap<>();
             systemMsg.put("role", "system");
             systemMsg.put("content", getValidationSystemPrompt());
             messages.add(systemMsg);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             Map<String, String> userMsg = new HashMap<>();
             userMsg.put("role", "user");
             userMsg.put("content", prompt);
             messages.add(userMsg);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             requestBody.put("messages", messages);
             requestBody.put("temperature", 0.2);
             requestBody.put("max_tokens", 800);
 
             String response = callLLM(config.getApiUrl(), config.getApiKey(), requestBody);
 
+<<<<<<< HEAD
             StepValidationResult result = parseValidationResponse(response);
             if (result != null) {
                 result.setValidationLevel(StepValidationResult.ValidationLevel.LLM_BASED);
             }
             return result;
+=======
+            return parseValidationResponse(response);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         } catch (Exception e) {
             log.error("LLM 验证调用失败: {}", e.getMessage());
@@ -398,6 +477,7 @@ public class TaskPlanValidatorService {
         }
     }
 
+<<<<<<< HEAD
     // ==================== 辅助方法 ====================
 
     /**
@@ -594,6 +674,8 @@ public class TaskPlanValidatorService {
 
     // ==================== LLM 验证相关方法 ====================
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private String getValidationSystemPrompt() {
         return "你是一个任务步骤执行结果验证器。你需要评估步骤执行结果是否达到了预期目标。\n\n" +
             "返回 JSON 格式：\n" +
@@ -615,8 +697,12 @@ public class TaskPlanValidatorService {
             "注意：\n" +
             "- 如果结果是\"未找到\"、\"无数据\"等，判断是否影响整体任务\n" +
             "- 如果工具返回错误信息，评估是否可以尝试其他方法\n" +
+<<<<<<< HEAD
             "- 如果步骤是关键步骤，失败时应建议重试或调整计划\n" +
             "- 警惕敷衍回答，如\"好的，我来帮你\"但没有实际内容\n";
+=======
+            "- 如果步骤是关键步骤，失败时应建议重试或调整计划\n";
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     private String buildValidationPrompt(StepValidationContext context) {
@@ -626,7 +712,11 @@ public class TaskPlanValidatorService {
         sb.append(context.getOriginalRequest()).append("\n\n");
 
         sb.append("=== 当前步骤 ===\n");
+<<<<<<< HEAD
         sb.append(String.format("步骤 %d/%d: %s\n\n",
+=======
+        sb.append(String.format("步骤 %d/%d: %s\n\n", 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 context.getStepNumber(), context.getTotalSteps(), context.getStepDescription()));
 
         if (context.getExpectedOutcome() != null && !context.getExpectedOutcome().isEmpty()) {
@@ -636,8 +726,13 @@ public class TaskPlanValidatorService {
 
         sb.append("=== 实际结果 ===\n");
         String result = context.getActualResult();
+<<<<<<< HEAD
         if (result != null && result.length() > 5000) {
             result = result.substring(0, 5000) + "...(已截断)";
+=======
+        if (result != null && result.length() > 1000) {
+            result = result.substring(0, 1000) + "...(已截断)";
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
         sb.append(result != null ? result : "(无结果)").append("\n\n");
 
@@ -652,6 +747,7 @@ public class TaskPlanValidatorService {
             sb.append(context.getErrorMessage()).append("\n\n");
         }
 
+<<<<<<< HEAD
         if (context.getRetryCount() > 0) {
             sb.append("=== 重试信息 ===\n");
             sb.append("当前重试次数: ").append(context.getRetryCount()).append("\n\n");
@@ -659,6 +755,9 @@ public class TaskPlanValidatorService {
 
         sb.append("请验证此步骤的执行结果并返回 JSON 格式的验证结果。\n");
         sb.append("特别注意：如果结果是敷衍回答（如\"好的，我来帮你\"但没有实际内容），请标记为无效。");
+=======
+        sb.append("请验证此步骤的执行结果并返回 JSON 格式的验证结果。");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         return sb.toString();
     }
@@ -731,6 +830,7 @@ public class TaskPlanValidatorService {
         }
     }
 
+<<<<<<< HEAD
     // ==================== 整体任务验证 ====================
 
     /**
@@ -855,6 +955,34 @@ public class TaskPlanValidatorService {
 
     // ==================== 计划调整相关方法 ====================
 
+=======
+    private StepValidationResult.ValidationAction determineActionFromError(String errorMessage) {
+        if (errorMessage == null) {
+            return StepValidationResult.ValidationAction.CONTINUE;
+        }
+
+        String lowerError = errorMessage.toLowerCase();
+
+        if (lowerError.contains("permission") || lowerError.contains("权限")) {
+            return StepValidationResult.ValidationAction.SKIP_STEP;
+        }
+
+        if (lowerError.contains("not found") || lowerError.contains("未找到") || lowerError.contains("不存在")) {
+            return StepValidationResult.ValidationAction.ADJUST_PLAN;
+        }
+
+        if (lowerError.contains("timeout") || lowerError.contains("超时")) {
+            return StepValidationResult.ValidationAction.RETRY_STEP;
+        }
+
+        if (lowerError.contains("rate limit") || lowerError.contains("限制")) {
+            return StepValidationResult.ValidationAction.RETRY_STEP;
+        }
+
+        return StepValidationResult.ValidationAction.RETRY_STEP;
+    }
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public PlanAdjustment generatePlanAdjustment(
             TaskPlanDTO originalPlan,
             int failedStepNumber,
@@ -875,18 +1003,30 @@ public class TaskPlanValidatorService {
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", config.getModelId());
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             List<Map<String, String>> messages = new ArrayList<>();
             Map<String, String> systemMsg = new HashMap<>();
             systemMsg.put("role", "system");
             systemMsg.put("content", getAdjustmentSystemPrompt());
             messages.add(systemMsg);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             Map<String, String> userMsg = new HashMap<>();
             userMsg.put("role", "user");
             userMsg.put("content", prompt);
             messages.add(userMsg);
+<<<<<<< HEAD
 
+=======
+            
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             requestBody.put("messages", messages);
             requestBody.put("temperature", 0.3);
             requestBody.put("max_tokens", 1000);
@@ -934,7 +1074,11 @@ public class TaskPlanValidatorService {
         sb.append("摘要: ").append(plan.getPlanSummary()).append("\n");
         sb.append("步骤:\n");
         for (TaskStepDTO step : plan.getSteps()) {
+<<<<<<< HEAD
             String status = step.getStepNumber() < failedStepNumber ? "✓" :
+=======
+            String status = step.getStepNumber() < failedStepNumber ? "✓" : 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                            (step.getStepNumber() == failedStepNumber ? "✗" : "○");
             sb.append(String.format("%d. %s %s", step.getStepNumber(), status, step.getDescription()));
             if (step.getToolName() != null && !step.getToolName().isEmpty()) {
@@ -998,6 +1142,7 @@ public class TaskPlanValidatorService {
         }
     }
 
+<<<<<<< HEAD
     // ==================== 工具方法 ====================
 
     private String extractJson(String content) {
@@ -1027,6 +1172,17 @@ public class TaskPlanValidatorService {
         }
 
         return cleaned.trim();
+=======
+    private String extractJson(String content) {
+        int start = content.indexOf('{');
+        int end = content.lastIndexOf('}');
+
+        if (start >= 0 && end > start) {
+            return content.substring(start, end + 1);
+        }
+
+        return content;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     private double getDouble(Map<String, Object> map, String key, double defaultValue) {
@@ -1070,7 +1226,11 @@ public class TaskPlanValidatorService {
         }
         return new ArrayList<>();
     }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private String buildFullApiUrl(String baseUrl) {
         if (baseUrl == null || baseUrl.isEmpty()) {
             return "/chat/completions";

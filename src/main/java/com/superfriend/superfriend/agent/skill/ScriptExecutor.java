@@ -3,7 +3,10 @@ package com.superfriend.superfriend.agent.skill;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
+<<<<<<< HEAD
 import org.springframework.beans.factory.annotation.Autowired;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import org.springframework.stereotype.Service;
 
 import java.io.*;
@@ -15,17 +18,25 @@ import java.util.List;
 @Slf4j
 @Service
 public class ScriptExecutor {
+<<<<<<< HEAD
 
     private ExecutorService executorService = null;
+=======
+    
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private final Map<String, Process> runningProcesses = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final long DEFAULT_TIMEOUT = 600000;
 
+<<<<<<< HEAD
     @Autowired
     public ScriptExecutor() {
         this.executorService = executorService;
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public ScriptExecutionResult executeScript(
         String scriptPath,
         Map<String, Object> parameters,
@@ -281,8 +292,11 @@ public class ScriptExecutor {
         private Map<String, Object> parsedOutput;
         /** 输出文件列表 */
         private List<String> outputFiles;
+<<<<<<< HEAD
         /** 输出目录路径 */
         private String outputDirectory;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         public static ScriptExecutionResult success(String output) {
             ScriptExecutionResult result = new ScriptExecutionResult();

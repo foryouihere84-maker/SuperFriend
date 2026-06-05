@@ -110,20 +110,31 @@ public class FileParseService {
             ParseResult result = parser.parse(fileUrl, mimeType);
             result.setOriginalFileName(extractFileName(fileUrl));
 
+<<<<<<< HEAD
             // 不再自动清理 temp 文件，改为会话结束时统一清理
             // 这样可以支持同一文件被多次引用
             // cleanupTempFileInternal(fileUrl);
+=======
+            // 解析完成后清理 temp 文件
+            cleanupTempFile(fileUrl);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
             return result;
         } catch (Exception e) {
             log.error("文件解析异常: {}", e.getMessage(), e);
+<<<<<<< HEAD
             // 解析失败也不清理文件，让会话管理器统一处理
             // cleanupTempFileInternal(fileUrl);
+=======
+            // 解析失败时也尝试清理文件
+            cleanupTempFile(fileUrl);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return ParseResult.failed("文件解析异常: " + e.getMessage());
         }
     }
 
     /**
+<<<<<<< HEAD
      * 解析文件（不自动清理 temp 文件）
      * 用于多文件批量解析场景，避免同一文件被多次引用时已被清理
      *
@@ -174,6 +185,12 @@ public class FileParseService {
      * temp://type/fileName -> uploads/temp/type/fileName
      */
     private void cleanupTempFileInternal(String fileUrl) {
+=======
+     * 清理 temp 文件
+     * temp://type/fileName -> uploads/temp/type/fileName
+     */
+    private void cleanupTempFile(String fileUrl) {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (fileUrl == null || !fileUrl.startsWith("temp://")) {
             return;
         }

@@ -1,5 +1,6 @@
 package com.superfriend.superfriend.agent.error;
 
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.List;
 
@@ -8,21 +9,28 @@ import java.util.List;
  *
  * 【增强版】支持更多恢复动作和上下文信息
  */
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 public class RecoveryResult {
     private boolean success;
     private String message;
     private long retryDelay;
     private RecoveryAction action;
+<<<<<<< HEAD
     private String alternativeTool;       // 替代工具
     private String adjustmentHint;        // 调整提示
     private List<String> suggestions;     // 建议列表
     private ErrorRecoveryManager.RecoveryLevel recoveryLevel;  // 恢复级别
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private RecoveryResult(boolean success, String message, long retryDelay, RecoveryAction action) {
         this.success = success;
         this.message = message;
         this.retryDelay = retryDelay;
         this.action = action;
+<<<<<<< HEAD
         this.suggestions = new ArrayList<>();
     }
 
@@ -108,10 +116,27 @@ public class RecoveryResult {
 
     // ==================== Getter 方法 ====================
 
+=======
+    }
+    
+    public static RecoveryResult success(String message) {
+        return new RecoveryResult(true, message, 0, RecoveryAction.CONTINUE);
+    }
+    
+    public static RecoveryResult failure(String message) {
+        return new RecoveryResult(false, message, 0, RecoveryAction.ABORT);
+    }
+    
+    public static RecoveryResult retry(String message, long delay) {
+        return new RecoveryResult(false, message, delay, RecoveryAction.RETRY);
+    }
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public boolean isSuccess() { return success; }
     public String getMessage() { return message; }
     public long getRetryDelay() { return retryDelay; }
     public RecoveryAction getAction() { return action; }
+<<<<<<< HEAD
     public String getAlternativeTool() { return alternativeTool; }
     public String getAdjustmentHint() { return adjustmentHint; }
     public List<String> getSuggestions() { return suggestions; }
@@ -167,5 +192,21 @@ enum RecoveryAction {
         this.description = description;
     }
 
+=======
+}
+
+enum RecoveryAction {
+    CONTINUE("Continue execution"),
+    RETRY("Retry the operation"),
+    ABORT("Abort the operation"),
+    FALLBACK("Use fallback mechanism");
+    
+    private final String description;
+    
+    RecoveryAction(String description) {
+        this.description = description;
+    }
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public String getDescription() { return description; }
 }

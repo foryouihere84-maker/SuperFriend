@@ -72,6 +72,7 @@ export class WindowsAdapter implements PlatformAdapter {
     }
 
     getDefaultPath(): string {
+<<<<<<< HEAD
         const paths: string[] = [];
         const homeDir = os.homedir();
 
@@ -252,6 +253,20 @@ export class WindowsAdapter implements PlatformAdapter {
         const uniquePaths = [...new Set(paths)];
 
         return uniquePaths.join(';');
+=======
+        // 包含常用开发工具路径
+        const paths = [
+            'C:\\Windows\\System32',
+            'C:\\Windows',
+            'C:\\Program Files\\dotnet',           // .NET SDK
+            'C:\\Program Files\\nodejs',           // Node.js
+            'C:\\Program Files\\Python313',        // Python
+            'C:\\Program Files\\Python313\\Scripts',
+            'C:\\Program Files\\Git\\bin',         // Git
+            'C:\\Program Files\\Git\\cmd'
+        ];
+        return paths.join(';');
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     resolvePath(filePath: string): string {

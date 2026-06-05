@@ -96,6 +96,13 @@ public class McpHostService {
 
     @Autowired
     @Lazy
+<<<<<<< HEAD
+=======
+    private UserProfileService userProfileService;
+
+    @Autowired
+    @Lazy
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private OrioSearchService orioSearchService;
 
     @Autowired
@@ -110,15 +117,21 @@ public class McpHostService {
     @Lazy
     private SystemContextBuilder systemContextBuilder;
 
+<<<<<<< HEAD
     @Autowired
     @Lazy
     private SessionFileIndexService sessionFileIndexService;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private final ConcurrentHashMap<String, McpServerProcess> runningServers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> serverLastUsedTime = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, List<McpToolDefinition>> toolsCache = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ServerCapabilities> serverCapabilities = new ConcurrentHashMap<>();
+<<<<<<< HEAD
     private final ConcurrentHashMap<String, CompletableFuture<List<McpToolDefinition>>> toolLoadingFutures = new ConcurrentHashMap<>();
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private final ConcurrentHashMap<String, Boolean> selectedServers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ToolStats> toolStats = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ErrorStats> errorStats = new ConcurrentHashMap<>();
@@ -149,6 +162,7 @@ public class McpHostService {
     @Value("${mcp.config-path:}")
     private String mcpConfigPath;
 
+<<<<<<< HEAD
     /**
      * MCP 配置加载优先级（从高到低）：
      * 1. 环境变量 MCP_CONFIG_PATH 指定的配置文件
@@ -200,13 +214,67 @@ public class McpHostService {
 
         if (!resource.exists()) {
             log.warn("【MCP配置】所有路径均未找到配置文件，使用默认配置");
+=======
+    public McpServersFile loadConfig() throws IOException {
+        // 1. 开发模式：项目目录下的配置文件
+        File smallConfigFile = new File("src/main/resources/mcpserverconfig/mcp-servers-small-config.json");
+
+        if (smallConfigFile.exists()) {
+            log.info("从项目目录加载精简 MCP 配置：{}", smallConfigFile.getAbsolutePath());
+            String content = readFileToString(smallConfigFile);
+            McpServersFile config = objectMapper.readValue(replacePathPlaceholders(content), McpServersFile.class);
+            return config;
+        }
+
+        // 2. 部署模式：环境变量指定的配置文件路径
+        if (mcpConfigPath != null && !mcpConfigPath.isEmpty()) {
+            File envConfigFile = new File(mcpConfigPath);
+            if (envConfigFile.exists()) {
+                log.info("从环境变量指定路径加载 MCP 配置：{}", envConfigFile.getAbsolutePath());
+                String content = readFileToString(envConfigFile);
+                McpServersFile config = objectMapper.readValue(replacePathPlaceholders(content), McpServersFile.class);
+                return config;
+            }
+        }
+
+        // 3. 部署模式：默认部署目录下的配置文件
+        File deployConfigFile = new File("/opt/superfriend/config/mcp-servers-config.json");
+        if (deployConfigFile.exists()) {
+            log.info("从部署目录加载 MCP 配置：{}", deployConfigFile.getAbsolutePath());
+            String content = readFileToString(deployConfigFile);
+            McpServersFile config = objectMapper.readValue(replacePathPlaceholders(content), McpServersFile.class);
+            return config;
+        }
+
+        // 4. 用户目录下的配置文件
+        String userHome = System.getProperty("user.home");
+        File externalConfigFile = new File(userHome, ".superfriend/mcp-servers-config.json");
+
+        if (externalConfigFile.exists()) {
+            log.info("从外部文件加载 MCP 配置：{}", externalConfigFile.getAbsolutePath());
+            String content = readFileToString(externalConfigFile);
+            McpServersFile config = objectMapper.readValue(replacePathPlaceholders(content), McpServersFile.class);
+            return config;
+        }
+
+        // 5. classpath 内置配置
+        log.info("从 classpath 加载 MCP 配置文件：{}", CONFIG_LOCATION);
+        Resource resource = new ClassPathResource(CONFIG_LOCATION);
+
+        if (!resource.exists()) {
+            log.warn("MCP 配置文件不存在：{}", CONFIG_LOCATION);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return createDefaultConfig();
         }
 
         try (InputStream inputStream = resource.getInputStream()) {
             String content = readInputStreamToString(inputStream);
             McpServersFile config = objectMapper.readValue(replacePathPlaceholders(content), McpServersFile.class);
+<<<<<<< HEAD
             log.info("【MCP配置】加载成功");
+=======
+            log.info("MCP 配置文件加载成功");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return config;
         }
     }
@@ -446,12 +514,30 @@ public class McpHostService {
     private void refreshToolsCache(String serverName) {
         McpServerProcess server = runningServers.get(serverName);
         if (server != null && server.isAlive()) {
+<<<<<<< HEAD
             // 复用 preloadTools 的去重逻辑，避免与预加载竞争
             preloadTools(serverName, server);
+=======
+            new Thread(() -> {
+                try {
+                    List<McpToolDefinition> tools = server.listTools();
+                    if (tools != null && !tools.isEmpty()) {
+                        for (McpToolDefinition tool : tools) {
+                            tool.setName(serverName + "__" + tool.getName());
+                        }
+                        toolsCache.put(serverName, tools);
+                        log.info("[{}] 工具缓存已刷新，共 {} 个工具", serverName, tools.size());
+                    }
+                } catch (Exception e) {
+                    log.error("[{}] 刷新工具缓存失败：{}", serverName, e.getMessage());
+                }
+            }).start();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
     }
     
     private void preloadTools(String serverName, McpServerProcess serverProcess) {
+<<<<<<< HEAD
         // 如果已有加载任务在运行，不重复启动
         CompletableFuture<List<McpToolDefinition>> existing = toolLoadingFutures.get(serverName);
         if (existing != null && !existing.isDone()) {
@@ -460,6 +546,9 @@ public class McpHostService {
         }
 
         CompletableFuture<List<McpToolDefinition>> future = CompletableFuture.supplyAsync(() -> {
+=======
+        new Thread(() -> {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             try {
                 Thread.sleep(500);
                 List<McpToolDefinition> tools = serverProcess.listTools();
@@ -469,6 +558,7 @@ public class McpHostService {
                     }
                     toolsCache.put(serverName, tools);
                     log.info("[{}] 预加载工具列表完成，共 {} 个工具", serverName, tools.size());
+<<<<<<< HEAD
                     return tools;
                 }
                 return Collections.emptyList();
@@ -479,6 +569,13 @@ public class McpHostService {
         });
 
         toolLoadingFutures.put(serverName, future);
+=======
+                }
+            } catch (Exception e) {
+                log.error("[{}] 预加载工具列表失败：{}", serverName, e.getMessage());
+            }
+        }).start();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
     
     public McpServerProcess getOrCreateServer(String serverName) {
@@ -550,12 +647,15 @@ public class McpHostService {
         toolsCache.remove(serverName);
         toolsCacheTimestamp.remove(serverName);
         serverCapabilities.remove(serverName);
+<<<<<<< HEAD
 
         // 取消正在进行的加载任务
         CompletableFuture<List<McpToolDefinition>> loadingFuture = toolLoadingFutures.remove(serverName);
         if (loadingFuture != null && !loadingFuture.isDone()) {
             loadingFuture.cancel(true);
         }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
     
     public void stopAllServers() {
@@ -564,6 +664,7 @@ public class McpHostService {
             stopServer(serverName);
         }
         toolsCache.clear();
+<<<<<<< HEAD
         toolsCacheTimestamp.clear();
         serverCapabilities.clear();
         // 取消所有加载任务
@@ -573,6 +674,9 @@ public class McpHostService {
             }
         }
         toolLoadingFutures.clear();
+=======
+        serverCapabilities.clear();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         log.info("[MCP] 所有 MCP Servers 已停止");
     }
 
@@ -674,6 +778,7 @@ public class McpHostService {
             }
         }
 
+<<<<<<< HEAD
         // Skills tools FIRST - load_skill and run_skill_script MUST be together at the top
         List<McpToolDefinition> skillsTools = new ArrayList<>();
         skillsTools.add(createGetSkillDetailsTool());      // 1. load_skill
@@ -693,6 +798,20 @@ public class McpHostService {
         skillsTools.add(createGetFileInfoTool());
         skillsTools.add(createGetFilePathTool());
 
+=======
+        // Skills tools FIRST - these are prioritized for the model
+        List<McpToolDefinition> skillsTools = new ArrayList<>();
+        skillsTools.add(createGetSkillDetailsTool());
+        skillsTools.add(createReadSkillResourceTool());
+        skillsTools.add(createRunSkillScriptTool());
+        skillsTools.add(createSetupSkillEnvironmentTool());
+        skillsTools.add(createSendFileTool());
+
+        // Web tools (OrioSearch) - HIGHEST PRIORITY for content extraction
+        skillsTools.add(0, createWebExtractTool());  // 最优先
+        skillsTools.add(createWebSearchTool());
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         // Then MCP tools
         List<McpToolDefinition> mcpTools = listToolsInternal(activeServerNames);
 
@@ -711,6 +830,7 @@ public class McpHostService {
             }
         }
 
+<<<<<<< HEAD
         // Skills tools FIRST - load_skill and run_skill_script MUST be together at the top
         List<McpToolDefinition> skillsTools = new ArrayList<>();
         skillsTools.add(createGetSkillDetailsTool());      // 1. load_skill
@@ -730,6 +850,20 @@ public class McpHostService {
         skillsTools.add(createGetFileInfoTool());
         skillsTools.add(createGetFilePathTool());
 
+=======
+        // Skills tools FIRST - these are prioritized for the model
+        List<McpToolDefinition> skillsTools = new ArrayList<>();
+        skillsTools.add(createGetSkillDetailsTool());
+        skillsTools.add(createReadSkillResourceTool());
+        skillsTools.add(createRunSkillScriptTool());
+        skillsTools.add(createSetupSkillEnvironmentTool());
+        skillsTools.add(createSendFileTool());
+
+        // Web tools (OrioSearch) - HIGHEST PRIORITY for content extraction
+        skillsTools.add(0, createWebExtractTool());  // 最优先
+        skillsTools.add(createWebSearchTool());
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         // Then MCP tools
         List<McpToolDefinition> mcpTools = listToolsInternal(activeServerNames);
 
@@ -749,8 +883,12 @@ public class McpHostService {
             "Load the full SKILL.md body with detailed instructions for a specific skill. " +
             "使用场景：当系统提示词中的 Skills 列表有匹配的技能时调用。 " +
             "返回内容：技能描述、环境状态、可用脚本列表、参考文件列表、详细指令。 " +
+<<<<<<< HEAD
             "⚡ CRITICAL: After calling load_skill, you MUST immediately call run_skill_script to execute the actual task. " +
             "DO NOT use bash-sandbox or write_file for document generation.");
+=======
+            "后续步骤：使用 read_skill_resource 读取参考文档，或 run_skill_script 执行脚本。");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         McpToolDefinition.JsonSchema schema = new McpToolDefinition.JsonSchema();
         schema.setType("object");
@@ -800,11 +938,16 @@ public class McpHostService {
         McpToolDefinition tool = new McpToolDefinition();
         tool.setName("run_skill_script");
         tool.setDescription(
+<<<<<<< HEAD
             "⚡ CRITICAL: Execute a skill script to perform the actual task. " +
             "This is the SECOND step after load_skill. " +
             "You MUST call this tool after loading a skill to generate files or perform actions. " +
             "DO NOT directly call bash-sandbox__execute or bash-sandbox__write_file for skill tasks - use run_skill_script instead. " +
             "(run_skill_script internally uses bash-sandbox with proper environment setup)");
+=======
+            "Execute a script within a skill. CRITICAL: 必须在 load_skill 之后调用。 " +
+            "脚本在沙箱中执行，输出文件自动发送给用户。");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         McpToolDefinition.JsonSchema schema = new McpToolDefinition.JsonSchema();
         schema.setType("object");
@@ -963,6 +1106,7 @@ public class McpHostService {
 
         return tool;
     }
+<<<<<<< HEAD
 
     // ==================== 文件工具定义 ====================
 
@@ -1111,6 +1255,9 @@ public class McpHostService {
         return tool;
     }
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private final ConcurrentHashMap<String, Long> toolsCacheTimestamp = new ConcurrentHashMap<>();
     
     private List<McpToolDefinition> listToolsInternal(Set<String> targetServers) {
@@ -1133,6 +1280,7 @@ public class McpHostService {
             
             if (server != null && server.isAlive()) {
                 List<McpToolDefinition> tools = toolsCache.get(serverName);
+<<<<<<< HEAD
 
                 if (tools == null) {
                     // 先检查是否有正在进行的加载任务
@@ -1158,6 +1306,20 @@ public class McpHostService {
                     }
                 }
 
+=======
+                
+                if (tools == null) {
+                    tools = server.listTools();
+                    if (tools != null && !tools.isEmpty()) {
+                        for (McpToolDefinition tool : tools) {
+                            tool.setServerName(serverName);
+                            tool.setName(serverName + "__" + tool.getName());
+                        }
+                        toolsCache.put(serverName, tools);
+                    }
+                }
+                
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 if (tools != null) {
                     allTools.addAll(tools);
                 }
@@ -1213,11 +1375,17 @@ public class McpHostService {
         return callToolWithRetry(serverName, toolName, arguments, 0);
     }
     
+<<<<<<< HEAD
     private McpToolCallResponse callToolWithRetry(String serverName, String toolName,
                                                    Map<String, Object> arguments, int attempt) {
         // 【修复】限制最大重试次数为1，避免与上层 ErrorRecoveryManager 的重试叠加
         // 策略性重试（换工具、换参数等）由 ErrorRecoveryManager 统一管理
         final int MAX_RETRIES = 1;
+=======
+    private McpToolCallResponse callToolWithRetry(String serverName, String toolName, 
+                                                  Map<String, Object> arguments, int attempt) {
+        final int MAX_RETRIES = 3;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         long startTime = System.currentTimeMillis();
         
         if ("load_skill".equals(toolName)) {
@@ -1247,6 +1415,7 @@ public class McpHostService {
         if ("web_extract".equals(toolName)) {
             return handleWebExtract(arguments);
         }
+<<<<<<< HEAD
 
         // File tools
         if ("list_files".equals(toolName)) {
@@ -1269,6 +1438,9 @@ public class McpHostService {
             return handleGetFilePath(arguments);
         }
 
+=======
+        
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (toolName.contains("__")) {
             String[] parts = toolName.split("__", 2);
             if (parts.length == 2) {
@@ -1285,6 +1457,7 @@ public class McpHostService {
             boolean found = false;
             for (String server : runningServers.keySet()) {
                 List<McpToolDefinition> tools = toolsCache.get(server);
+<<<<<<< HEAD
 
                 // 缓存为空时，等待加载完成
                 if (tools == null) {
@@ -1298,6 +1471,8 @@ public class McpHostService {
                     }
                 }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 if (tools != null) {
                     for (McpToolDefinition tool : tools) {
                         String fullName = tool.getName();
@@ -1366,6 +1541,7 @@ public class McpHostService {
     
     private boolean toolExists(String serverName, String toolName) {
         List<McpToolDefinition> tools = toolsCache.get(serverName);
+<<<<<<< HEAD
 
         // 缓存为空时，等待正在进行的加载任务完成
         if (tools == null || tools.isEmpty()) {
@@ -1390,6 +1566,15 @@ public class McpHostService {
         String expectedFullName = serverName + "__" + toolName;
         return tools.stream().anyMatch(tool ->
             tool.getName().equals(expectedFullName) ||
+=======
+        if (tools == null || tools.isEmpty()) {
+            return false;
+        }
+        
+        String expectedFullName = serverName + "__" + toolName;
+        return tools.stream().anyMatch(tool -> 
+            tool.getName().equals(expectedFullName) || 
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             tool.getName().endsWith("__" + toolName)
         );
     }
@@ -1559,6 +1744,7 @@ public class McpHostService {
 
         String skillName = arguments != null ? (String) arguments.get("skill_name") : null;
         String scriptName = arguments != null ? (String) arguments.get("script_name") : null;
+<<<<<<< HEAD
         Map<String, Object> parameters = null;
         if (arguments != null && arguments.get("parameters") != null) {
             Object paramsObj = arguments.get("parameters");
@@ -1578,6 +1764,9 @@ public class McpHostService {
                 log.warn("handleRunSkillScript: parameters 类型不支持: {}", paramsObj.getClass().getName());
             }
         }
+=======
+        Map<String, Object> parameters = arguments != null ? (Map<String, Object>) arguments.get("parameters") : null;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         String sessionId = arguments != null ? (String) arguments.get("session_id") : null;
 
         log.info("handleRunSkillScript: skillName={}, scriptName={}, onResponse={}, sessionId={}",
@@ -1596,13 +1785,19 @@ public class McpHostService {
         }
 
         try {
+<<<<<<< HEAD
             // 传入 sessionId 确保会话一致性（Agent ExecutionContext 与沙箱会话关联）
             ScriptExecutor.ScriptExecutionResult result = skillRegistry.executeSkillScript(
                 skillName, scriptName, parameters != null ? parameters : new HashMap<>(), sessionId);
+=======
+            ScriptExecutor.ScriptExecutionResult result = skillRegistry.executeSkillScript(
+                skillName, scriptName, parameters != null ? parameters : new HashMap<>());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
             if (result.isSuccess()) {
                 response.setSuccess(true);
 
+<<<<<<< HEAD
                 String outputStr = result.getOutput();
                 log.info("handleRunSkillScript: 脚本执行成功, output长度={}, outputFiles={}",
                     outputStr != null ? outputStr.length() : 0,
@@ -1614,6 +1809,17 @@ public class McpHostService {
                 // 如果检测到的文件列表为空，尝试从 output JSON 中解析
                 if ((detectedFiles == null || detectedFiles.isEmpty()) && outputStr != null && onResponse != null) {
                     try {
+=======
+                // 检查是否有文件输出
+                String outputStr = result.getOutput();
+                log.info("handleRunSkillScript: 脚本执行成功, output长度={}, output前200字符={}",
+                    outputStr != null ? outputStr.length() : 0,
+                    outputStr != null && outputStr.length() > 200 ? outputStr.substring(0, 200) : outputStr);
+
+                if (outputStr != null && onResponse != null) {
+                    try {
+                        // 尝试解析 output 中的文件路径
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                         Map<String, Object> outputMap = objectMapper.readValue(outputStr, Map.class);
                         String filePath = null;
 
@@ -1623,6 +1829,7 @@ public class McpHostService {
                                         outputMap.get("filePath"));
                         }
 
+<<<<<<< HEAD
                         if (filePath != null) {
                             detectedFiles = new ArrayList<>();
                             detectedFiles.add(filePath);
@@ -1642,21 +1849,97 @@ public class McpHostService {
                     // FileLifecycleManager 会在 24 小时后自动清理文件
                     // 原始输出目录中的文件已被 sendFileToUser 复制到新路径
                     log.info("文件已发送并注册到生命周期管理器，将在 24 小时后自动清理");
+=======
+                        log.info("handleRunSkillScript: 解析JSON成功, outputFile={}, output_path={}, filePath={}, 最终filePath={}",
+                            outputMap.get("outputFile"), outputMap.get("output_path"), outputMap.get("filePath"), filePath);
+
+                        // 如果 output 本身是文件路径（检测常见文件扩展名）
+                        if (filePath == null && outputStr.contains(".") && !outputStr.contains("\n") && outputStr.length() < 500) {
+                            // 简单判断是否可能是文件路径
+                            if (outputStr.matches(".*\\.[a-zA-Z0-9]{1,10}$")) {
+                                filePath = outputStr.trim();
+                            }
+                        }
+
+                        // 如果检测到文件，发送 SSE 并注册文件生命周期
+                        if (filePath != null) {
+                            File file = new File(filePath);
+                            log.info("handleRunSkillScript: 检测到文件路径={}, 文件存在={}, 是文件={}",
+                                filePath, file.exists(), file.isFile());
+
+                            if (file.exists() && file.isFile()) {
+                                // 重命名文件，添加时间戳后缀避免冲突
+                                File renamedFile = copyFileWithTimestamp(file, sessionId);
+                                String filePathToSend = renamedFile.getAbsolutePath();
+                                String fileName = renamedFile.getName();
+                                String fileType = getFileType(fileName);
+                                String mimeType = detectMimeType(fileName);
+
+                                // 先注册文件到生命周期管理器
+                                fileLifecycleManager.registerFile(filePathToSend, "skill:" + skillName, sessionId);
+
+                                try {
+                                    String base64Content = Base64.getEncoder().encodeToString(
+                                        java.nio.file.Files.readAllBytes(renamedFile.toPath()));
+                                    String fileId = "skill-" + skillName + "-" + scriptName + "-" + System.currentTimeMillis();
+
+                                    AIChatResponse fileResponse = new AIChatResponse();
+                                    fileResponse.setType("file");
+                                    fileResponse.setSessionId(sessionId);
+                                    fileResponse.setResourceId(fileId);
+                                    fileResponse.setFileName(fileName);
+                                    fileResponse.setFileType(fileType);
+                                    fileResponse.setFileSize(renamedFile.length());
+                                    fileResponse.setContent("data:" + mimeType + ";base64," + base64Content);
+
+                                    // 发送 SSE
+                                    onResponse.accept(fileResponse);
+
+                                    // 发送成功，标记文件为已发送
+                                    fileLifecycleManager.markAsSent(filePathToSend);
+
+                                    log.info("Skill {} 发送文件 SSE 给前端: {} ({} bytes, type={}, mime={})",
+                                        skillName, fileName, renamedFile.length(), fileType, mimeType);
+
+                                } catch (Exception sendEx) {
+                                    // SSE 发送失败，记录错误但保留文件注册（等待后续清理）
+                                    log.error("Skill {} 发送文件 SSE 失败: {} - {}", skillName, fileName, sendEx.getMessage());
+                                    // 文件已注册但未标记，将在 TTL 后被清理
+                                }
+                            }
+                        }
+                    } catch (Exception parseEx) {
+                        log.warn("handleRunSkillScript: 解析output失败: {}", parseEx.getMessage());
+                        // output 不是 JSON，忽略
+                    }
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 } else if (onResponse == null) {
                     log.warn("handleRunSkillScript: onResponse 为 null，无法发送文件 SSE");
                 }
 
+<<<<<<< HEAD
                 // 构建返回信息
+=======
+                // 构建更清晰的返回信息
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 StringBuilder resultText = new StringBuilder();
                 resultText.append("✅ 脚本执行成功\n");
                 resultText.append("- 技能: ").append(skillName).append("\n");
                 resultText.append("- 脚本: ").append(scriptName).append("\n");
                 resultText.append("- 执行时间: ").append(result.getExecutionTime()).append("ms\n");
 
+<<<<<<< HEAD
                 if (detectedFiles != null && !detectedFiles.isEmpty()) {
                     resultText.append("- 输出文件:\n");
                     for (String filePath : detectedFiles) {
                         resultText.append("  - ").append(filePath).append("\n");
+=======
+                // 添加输出文件信息
+                if (result.getOutputFiles() != null && !result.getOutputFiles().isEmpty()) {
+                    resultText.append("- 输出文件:\n");
+                    for (String filePath : result.getOutputFiles()) {
+                        resultText.append("  - ").append(filePath).append(" (已发送给用户)\n");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     }
                 }
 
@@ -1680,6 +1963,7 @@ public class McpHostService {
     }
 
     /**
+<<<<<<< HEAD
      * 发送文件给用户
      */
     private void sendFileToUser(String filePath, String skillName, String scriptName,
@@ -1736,6 +2020,8 @@ public class McpHostService {
     }
 
     /**
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      * 处理 bash-sandbox execute 工具调用
      *
      * 注意：bash-sandbox 在独立进程中运行，Java 后端无法直接访问沙箱内的文件。
@@ -1801,8 +2087,12 @@ public class McpHostService {
             // 读取文件内容
             String base64Content = Base64.getEncoder().encodeToString(
                 java.nio.file.Files.readAllBytes(renamedFile.toPath()));
+<<<<<<< HEAD
             // fileId 使用纯 ASCII 字符，避免中文在 SSE 传输/IndexedDB 存取中出问题
             String fileId = "send_file-" + System.currentTimeMillis() + "-" + renamedFile.length();
+=======
+            String fileId = "send_file-" + System.currentTimeMillis() + "-" + fileName;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
             // 构建 SSE 响应
             AIChatResponse fileResponse = new AIChatResponse();
@@ -1817,8 +2107,13 @@ public class McpHostService {
             // 发送 SSE
             onResponse.accept(fileResponse);
 
+<<<<<<< HEAD
             // 标记文件为已发送（使用复制后的路径，与 registerFile 一致）
             fileLifecycleManager.markAsSent(filePathToSend);
+=======
+            // 标记文件为已发送
+            fileLifecycleManager.markAsSent(filePath);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
             log.info("发送文件给前端: {} ({} bytes, type={})", fileName, file.length(), fileType);
 
@@ -2246,6 +2541,7 @@ public class McpHostService {
         return response;
     }
 
+<<<<<<< HEAD
     // ==================== 文件工具处理方法 ====================
 
     private McpToolCallResponse handleListFiles(Map<String, Object> arguments) {
@@ -2633,6 +2929,8 @@ public class McpHostService {
         }
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public Set<String> getRunningServers() {
         return runningServers.keySet();
     }
@@ -3036,8 +3334,11 @@ public class McpHostService {
                     JsonNode usage = chunk.getUsage();
                     totalInputTokens[0] = usage.path("prompt_tokens").asLong(0);
                     totalOutputTokens[0] = usage.path("completion_tokens").asLong(0);
+<<<<<<< HEAD
                     if (totalInputTokens[0] == 0) totalInputTokens[0] = usage.path("input_tokens").asLong(0);
                     if (totalOutputTokens[0] == 0) totalOutputTokens[0] = usage.path("output_tokens").asLong(0);
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 }
 
                 if (chunk.isDone()) {
@@ -3331,8 +3632,11 @@ public class McpHostService {
                     JsonNode usage = chunk.getUsage();
                     totalInputTokens[0] = usage.path("prompt_tokens").asLong(0);
                     totalOutputTokens[0] = usage.path("completion_tokens").asLong(0);
+<<<<<<< HEAD
                     if (totalInputTokens[0] == 0) totalInputTokens[0] = usage.path("input_tokens").asLong(0);
                     if (totalOutputTokens[0] == 0) totalOutputTokens[0] = usage.path("output_tokens").asLong(0);
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 }
 
                 if (chunk.isDone()) {
@@ -3369,6 +3673,7 @@ public class McpHostService {
                     // 记录观测数据
                     observabilityService.endTrace(observabilityTraceId, "completed", null);
 
+<<<<<<< HEAD
                     // 保存对话历史（Lite 模式也需要保存，以便后续对话引用）
                     try {
                         String userText = request.getEffectiveText();
@@ -3389,6 +3694,8 @@ public class McpHostService {
                         log.warn("[sessionId={}] 保存 Lite 模式对话历史失败: {}", sessionId, e.getMessage());
                     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     log.info("[sessionId={}] Lite 多模态对话完成，tokens: input={}, output={}, cost={}",
                         sessionId, totalInputTokens[0], totalOutputTokens[0], totalCost[0]);
                 }
@@ -3971,8 +4278,11 @@ public class McpHostService {
             .toBuilder()
             .messages(messages)
             .stream(true)
+<<<<<<< HEAD
             .maxTokens(50000)
             .sessionId(sessionId)
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             .build();
 
         final StringBuilder contentBuilder = new StringBuilder();
@@ -3981,7 +4291,10 @@ public class McpHostService {
         final String[] errorHolder = {null};
         final JsonNode[] usageHolder = {null};
         final boolean[] hasError = {false};
+<<<<<<< HEAD
         final String[] finishReasonHolder = {null};  // 新增：捕获 finish_reason
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         final String finalModel = model;
 
         if (!toolDefs.isEmpty()) {
@@ -4019,11 +4332,14 @@ public class McpHostService {
                 if (chunk.getUsage() != null) {
                     usageHolder[0] = chunk.getUsage();
                 }
+<<<<<<< HEAD
                 // 新增：捕获 finish_reason
                 if (chunk.getFinishReason() != null) {
                     finishReasonHolder[0] = chunk.getFinishReason();
                     log.info("[McpHostService] 收到 finish_reason: {}", chunk.getFinishReason());
                 }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             });
         } else {
             llmClient.streamChat(request, chunk -> {
@@ -4055,11 +4371,14 @@ public class McpHostService {
                 if (chunk.getUsage() != null) {
                     usageHolder[0] = chunk.getUsage();
                 }
+<<<<<<< HEAD
                 // 新增：捕获 finish_reason
                 if (chunk.getFinishReason() != null) {
                     finishReasonHolder[0] = chunk.getFinishReason();
                     log.info("[McpHostService] 收到 finish_reason: {}", chunk.getFinishReason());
                 }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             });
         }
 
@@ -4071,6 +4390,7 @@ public class McpHostService {
             JsonNode usage = usageHolder[0];
             if (usage.has("prompt_tokens")) {
                 totalInputTokens[0] += usage.get("prompt_tokens").asLong();
+<<<<<<< HEAD
             } else if (usage.has("input_tokens")) {
                 totalInputTokens[0] += usage.get("input_tokens").asLong();
             }
@@ -4078,6 +4398,11 @@ public class McpHostService {
                 totalOutputTokens[0] += usage.get("completion_tokens").asLong();
             } else if (usage.has("output_tokens")) {
                 totalOutputTokens[0] += usage.get("output_tokens").asLong();
+=======
+            }
+            if (usage.has("completion_tokens")) {
+                totalOutputTokens[0] += usage.get("completion_tokens").asLong();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
         }
 
@@ -4086,12 +4411,17 @@ public class McpHostService {
         if (!content.trim().isEmpty()) {
             response.setContent(content);
         }
+<<<<<<< HEAD
 
+=======
+        
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         String reasoningContent = reasoningBuilder.toString();
         if (!reasoningContent.trim().isEmpty()) {
             response.setReasoningContent(reasoningContent);
         }
 
+<<<<<<< HEAD
         // 设置 finishReason
         if (finishReasonHolder[0] != null) {
             response.setFinishReason(finishReasonHolder[0]);
@@ -4100,6 +4430,8 @@ public class McpHostService {
             }
         }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         if (rawToolCalls != null && !rawToolCalls.isEmpty()) {
             log.info("[McpHostService] 累积完成，共 {} 个工具调用，开始转换为 ToolCall 对象", rawToolCalls.size());
             List<ToolCall> toolCalls = new ArrayList<>();

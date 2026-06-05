@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.HashMap;
+<<<<<<< HEAD
 import java.util.regex.Pattern;
 
 @Data
@@ -66,6 +67,29 @@ public class SkillConfig {
     private String instructions;
 
     // 以下字段建议迁移到 metadata 中，但保留向后兼容
+=======
+
+@Data
+public class SkillConfig {
+    private String name;
+    private String description;
+    private String license;
+    private String compatibility;
+    private Map<String, Object> metadata = new HashMap<>();
+    private List<String> allowedTools = new ArrayList<>();
+    private String instructions;
+    private String category;
+    private String version = "1.0.0";
+    private String author;
+    private List<String> tags = new ArrayList<>();
+    private Map<String, Object> parameters = new HashMap<>();
+    private SkillMetadata.SkillPriority priority = SkillMetadata.SkillPriority.MEDIUM;
+    private long timeout = 60000L;
+    private boolean hasScripts = false;
+    private String mainScript;
+    private List<Map<String, Object>> scripts = new ArrayList<>();
+    private List<Map<String, Object>> resources = new ArrayList<>();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
     public SkillConfig() {
     }
@@ -75,6 +99,7 @@ public class SkillConfig {
         this.description = description;
     }
 
+<<<<<<< HEAD
     // ==================== 协议验证方法 ====================
 
     private static final Pattern NAME_PATTERN = Pattern.compile("^[a-z0-9]([a-z0-9-]*[a-z0-9])?$");
@@ -149,6 +174,8 @@ public class SkillConfig {
 
     // ==================== 辅助方法 ====================
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public String getMetadataString(String key) {
         Object value = metadata.get(key);
         return value != null ? String.valueOf(value) : null;
@@ -182,6 +209,7 @@ public class SkillConfig {
         }
         return false;
     }
+<<<<<<< HEAD
 
     /**
      * 检查是否有执行器配置
@@ -467,4 +495,6 @@ public class SkillConfig {
         private Map<String, String> environment = new HashMap<>();
         private String buildTemplate;
     }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 }

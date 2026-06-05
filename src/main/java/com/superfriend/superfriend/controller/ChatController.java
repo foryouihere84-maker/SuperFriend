@@ -51,7 +51,11 @@ public class ChatController {
 
     @Resource
     @Lazy
+<<<<<<< HEAD
     private MemoryPalaceService memoryPalaceService;
+=======
+    private DelayedExtractionQueueService delayedExtractionQueueService;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Setter
     @Getter
     private HttpServletRequest httpRequest;
@@ -128,6 +132,7 @@ public class ChatController {
 
             try {
                 String jsonData = objectMapper.writeValueAsString(aiResponse);
+<<<<<<< HEAD
 
                 // 调试日志：检查文件类型消息的序列化
                 if ("file".equals(aiResponse.getType()) || "pdf".equals(aiResponse.getType())) {
@@ -139,6 +144,8 @@ public class ChatController {
                         aiResponse.getFileName());
                 }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 response.getWriter().write("data: " + jsonData + "\n\n");
                 response.getWriter().flush();
                 context.updateActivity();
@@ -393,7 +400,11 @@ public class ChatController {
     }
 
     @PostMapping("/finalize/{sessionId}")
+<<<<<<< HEAD
     @Operation(summary = "结束对话", description = "结束对话并触发记忆提取，应在用户关闭/切换对话时调用")
+=======
+    @Operation(summary = "结束对话", description = "结束对话并安排延迟知识提取，应在用户关闭/切换对话时调用")
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public Map<String, Object> finalizeConversation(
             @PathVariable String sessionId,
             @RequestBody(required = false) Map<String, Object> body) {
@@ -401,15 +412,25 @@ public class ChatController {
             ? Long.valueOf(body.get("userId").toString()) : null;
         String model = body != null ? (String) body.get("model") : null;
 
+<<<<<<< HEAD
         log.info("收到结束对话请求：sessionId={}, userId={}, model={}", sessionId, userId, model);
+=======
+        log.info("收到结束对话请求（延迟提取）：sessionId={}, userId={}, model={}", sessionId, userId, model);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         Map<String, Object> result = new HashMap<>();
 
         try {
+<<<<<<< HEAD
             // 使用记忆宫殿系统进行记忆提取
             contextMangerService.finalizeConversation(sessionId, userId, model);
             result.put("success", true);
             result.put("message", "记忆提取已完成");
+=======
+            delayedExtractionQueueService.scheduleDelayedExtraction(sessionId, userId, model);
+            result.put("success", true);
+            result.put("message", "已安排延迟知识提取");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             result.put("sessionId", sessionId);
         } catch (Exception e) {
             log.error("结束对话失败：{}", e.getMessage(), e);
@@ -421,18 +442,31 @@ public class ChatController {
     }
 
     @PostMapping("/extract/{sessionId}")
+<<<<<<< HEAD
     @Operation(summary = "立即提取记忆", description = "立即执行记忆提取，前端传入对话内容")
+=======
+    @Operation(summary = "立即提取知识", description = "立即执行知识提取，前端传入对话内容，无条件执行")
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public Map<String, Object> extractNow(
             @PathVariable String sessionId,
             @RequestBody(required = false) Map<String, Object> body) {
         Long userId = body != null && body.get("userId") != null
             ? Long.valueOf(body.get("userId").toString()) : null;
+<<<<<<< HEAD
+=======
+        String model = body != null ? (String) body.get("model") : null;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> messages = body != null
             ? (List<Map<String, Object>>) body.get("messages") : null;
 
+<<<<<<< HEAD
         log.info("[手动提取] 收到请求: sessionId={}, userId={}, messageCount={}",
             sessionId, userId, messages != null ? messages.size() : 0);
+=======
+        log.info("[手动提取] 收到请求: sessionId={}, userId={}, model={}, messageCount={}",
+            sessionId, userId, model, messages != null ? messages.size() : 0);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         Map<String, Object> result = new HashMap<>();
 
@@ -441,11 +475,16 @@ public class ChatController {
                 log.warn("[手动提取] 消息列表为空: sessionId={}", sessionId);
                 result.put("success", false);
                 result.put("status", "NO_MESSAGES");
+<<<<<<< HEAD
                 result.put("message", "对话内容为空，无法提取记忆");
+=======
+                result.put("message", "对话内容为空，无法提取知识");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 result.put("sessionId", sessionId);
                 return result;
             }
 
+<<<<<<< HEAD
             // 获取最后一条用户消息和助手回复
             String lastUserMessage = null;
             String lastAssistantReply = null;
@@ -471,19 +510,45 @@ public class ChatController {
                 result.put("success", false);
                 result.put("status", "NO_CONTENT");
                 result.put("message", "无法提取有效的对话内容");
+=======
+            DelayedExtractionQueueService.ExtractionResult extractionResult =
+                delayedExtractionQueueService.executeImmediate(sessionId, userId, model, messages);
+
+            switch (extractionResult) {
+                case SUCCESS:
+                    result.put("success", true);
+                    result.put("status", "SUCCESS");
+                    result.put("message", "知识提取已触发");
+                    break;
+                case EXTRACTING:
+                    result.put("success", false);
+                    result.put("status", "EXTRACTING");
+                    result.put("message", "知识提取正在进行中，请稍后再试");
+                    break;
+                case FAILED:
+                    result.put("success", false);
+                    result.put("status", "FAILED");
+                    result.put("message", "知识提取失败");
+                    break;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             }
             result.put("sessionId", sessionId);
         } catch (Exception e) {
             log.error("[手动提取] 失败: sessionId={}, error={}", sessionId, e.getMessage(), e);
             result.put("success", false);
             result.put("status", "ERROR");
+<<<<<<< HEAD
             result.put("message", "记忆提取失败：" + e.getMessage());
+=======
+            result.put("message", "知识提取失败：" + e.getMessage());
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         }
 
         return result;
     }
 
     @GetMapping("/extraction-status/{sessionId}")
+<<<<<<< HEAD
     @Operation(summary = "查询提取状态", description = "查询指定会话的记忆提取状态")
     public Map<String, Object> getExtractionStatus(@PathVariable String sessionId) {
         Map<String, Object> result = new HashMap<>();
@@ -493,6 +558,22 @@ public class ChatController {
         result.put("status", "COMPLETED");
         result.put("message", "记忆提取已完成");
         result.put("inProgress", false);
+=======
+    @Operation(summary = "查询提取状态", description = "查询指定会话的知识提取状态")
+    public Map<String, Object> getExtractionStatus(@PathVariable String sessionId) {
+        Map<String, Object> result = new HashMap<>();
+
+        DelayedExtractionQueueService.ExtractionStatus status =
+            delayedExtractionQueueService.getExtractionStatus(sessionId);
+
+        result.put("sessionId", sessionId);
+        result.put("status", status.getStatus());
+        result.put("message", status.getMessage());
+        result.put("inProgress", status.isInProgress());
+        if (status.getRemainingSeconds() != null) {
+            result.put("remainingSeconds", status.getRemainingSeconds());
+        }
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
         return result;
     }

@@ -8,11 +8,17 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
+<<<<<<< HEAD
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+=======
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import java.util.function.Consumer;
 
 /**
@@ -25,6 +31,7 @@ public class ChatOrchestrator {
 
     private final Map<String, ChatModeStrategy> strategyMap;
 
+<<<<<<< HEAD
     // 文件内容最大长度限制（字符数），约 500KB 文本
     private static final int MAX_FILE_CONTENT_LENGTH = 500_0000;
 
@@ -34,6 +41,8 @@ public class ChatOrchestrator {
     // 小文件阈值（50KB），小于此值会预解析
     private static final int SMALL_FILE_THRESHOLD = 5000* 1024;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Autowired
     @Lazy
     private UserIntentService userIntentService;
@@ -46,10 +55,13 @@ public class ChatOrchestrator {
     @Lazy
     private MultimodalProcessService multimodalProcessService;
 
+<<<<<<< HEAD
     @Autowired
     @Lazy
     private SessionFileIndexService sessionFileIndexService;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public ChatOrchestrator(List<ChatModeStrategy> strategies) {
         this.strategyMap = new HashMap<>();
         for (ChatModeStrategy strategy : strategies) {
@@ -97,6 +109,7 @@ public class ChatOrchestrator {
                 return multimodalProcessService.process(request, intent, callback);
 
             case GENERATE_DOCUMENT:
+<<<<<<< HEAD
                 // 文档生成需要工具调用能力，Lite 模式自动升级到 Medium 模式
                 if (ChatMode.LITE_TASK.equals(mode)) {
                     log.info("GENERATE_DOCUMENT 意图在 Lite 模式下自动升级到 Medium 模式");
@@ -110,6 +123,10 @@ public class ChatOrchestrator {
                 } else {
                     strategy.executeChat(request, intent, callback);
                 }
+=======
+                // 文档生成走普通对话（由 Agent skill 处理）
+                strategy.executeChat(request, intent, callback);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 return null;
 
             case PARSE_FILE:
@@ -134,13 +151,18 @@ public class ChatOrchestrator {
 
     /**
      * 处理文件解析后的对话
+<<<<<<< HEAD
      * 使用动态文件索引机制：小文件预解析，大文件按需读取
+=======
+     * 统一的文件解析逻辑，消除 3 份重复代码
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
      */
     private void handleFileParseAndChat(AIChatRequest request, UserIntent intent,
                                          ChatModeStrategy strategy,
                                          Consumer<AIChatResponse> callback) {
         log.info("处理文件解析请求: {}", intent.getType());
 
+<<<<<<< HEAD
         String sessionId = request.getSessionId();
 
         // Step 1: 获取所有文件 URL
@@ -163,12 +185,29 @@ public class ChatOrchestrator {
 
         if (files.isEmpty()) {
             sendError(callback, sessionId, request.getModel(), "未找到要解析的文件");
+=======
+        // Step 1: 获取文件 URL
+        String fileUrl = intent.getFileUrl();
+        String mimeType = intent.getMimeType();
+
+        if (fileUrl == null || fileUrl.isEmpty()) {
+            List<String[]> files = userIntentService.extractFiles(request);
+            if (!files.isEmpty()) {
+                fileUrl = files.get(0)[0];
+                mimeType = files.get(0)[1];
+            }
+        }
+
+        if (fileUrl == null) {
+            sendError(callback, request.getSessionId(), request.getModel(), "未找到要解析的文件");
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             return;
         }
 
         // Step 2: 发送解析状态
         AIChatResponse parsingStatus = new AIChatResponse();
         parsingStatus.setType("thinking");
+<<<<<<< HEAD
         parsingStatus.setContent(files.size() > 1 ?
             "正在处理 " + files.size() + " 个文件..." : "正在处理文件...");
         parsingStatus.setSessionId(sessionId);
@@ -215,12 +254,32 @@ public class ChatOrchestrator {
         String fileListPrompt = buildFileListPrompt(sessionId, registeredFiles);
 
         // Step 5: 构建增强消息
+=======
+        parsingStatus.setContent("正在解析文件...");
+        parsingStatus.setSessionId(request.getSessionId());
+        parsingStatus.setModel(request.getModel());
+        callback.accept(parsingStatus);
+
+        // Step 3: 解析文件
+        ParseResult parseResult = fileParseService.parse(fileUrl, mimeType);
+
+        if (!parseResult.isSuccess() || !parseResult.hasContent()) {
+            sendError(callback, request.getSessionId(), request.getModel(),
+                    "文件解析失败: " + parseResult.getErrorMessage());
+            return;
+        }
+
+        log.info("文件解析成功，内容长度: {}", parseResult.getTextContent().length());
+
+        // Step 4: 构建增强消息
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         String userText = request.getEffectiveText();
         StringBuilder enhancedMessage = new StringBuilder();
 
         if (userText != null && !userText.isEmpty()) {
             enhancedMessage.append(userText);
         }
+<<<<<<< HEAD
 
         enhancedMessage.append(fileListPrompt);
 
@@ -379,6 +438,15 @@ public class ChatOrchestrator {
         return url;
     }
 
+=======
+        enhancedMessage.append("\n\n--- 文件内容 ---\n");
+        enhancedMessage.append(parseResult.getFormattedContentForLLM());
+
+        // Step 5: 调用策略执行
+        strategy.executeFileParsedChat(request, intent, enhancedMessage.toString(), callback);
+    }
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private void sendError(Consumer<AIChatResponse> callback, String sessionId, String model, String message) {
         AIChatResponse errorResponse = new AIChatResponse();
         errorResponse.setType("error");

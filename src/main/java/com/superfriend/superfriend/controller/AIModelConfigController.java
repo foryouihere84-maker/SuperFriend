@@ -20,8 +20,12 @@ import java.util.Map;
 @RequestMapping("/api/v16/model-config")
 @CrossOrigin(origins = "*")
 @Tag(name = "模型配置管理", description = "AI 模型配置的增删改查与切换")
+<<<<<<< HEAD
 public class
 AIModelConfigController {
+=======
+public class AIModelConfigController {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 
     @Autowired
     private AIModelConfigService modelConfigService;

@@ -32,9 +32,12 @@ public class TencentNewsCacheService {
     @Value("${news.oriosearch.queries:AI 人工智能,科技新闻,互联网热点}")
     private String orioSearchQueries;
 
+<<<<<<< HEAD
     @Value("${news.oriosearch.engines:}")
     private String orioSearchEngines;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public TencentNewsCacheService(OrioSearchService orioSearchService) {
         this.orioSearchService = orioSearchService;
     }
@@ -84,11 +87,15 @@ public class TencentNewsCacheService {
                 query = query.trim();
                 if (query.isEmpty()) continue;
                 
+<<<<<<< HEAD
                 // 使用新的 searchNews 方法，支持 engines 参数
                 // 正确做法：
                 // 1. 不带引擎（走默认）：/search?q=科技新闻&time_range=day
                 // 2. 指定引擎：/search?q=科技新闻&engines=bing news
                 OrioSearchService.SearchResult result = orioSearchService.searchNews(query, orioSearchTimeRange, orioSearchEngines);
+=======
+                OrioSearchService.SearchResult result = orioSearchService.searchNews(query, orioSearchTimeRange);
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 
                 if (result != null && result.getResults() != null) {
                     for (OrioSearchService.SearchResultItem item : result.getResults()) {

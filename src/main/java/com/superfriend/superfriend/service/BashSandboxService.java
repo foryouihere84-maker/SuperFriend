@@ -9,6 +9,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+<<<<<<< HEAD
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,11 +17,20 @@ import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
+=======
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Service;
+
+import javax.annotation.PostConstruct;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+<<<<<<< HEAD
 import java.util.concurrent.ConcurrentHashMap;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -44,6 +54,7 @@ public class BashSandboxService {
     private Counter sessionCreatedCounter;
     private Counter sessionClosedCounter;
 
+<<<<<<< HEAD
     // 待延迟清理的会话：Key=sessionId, Value=加入时间戳
     private final ConcurrentHashMap<String, Long> pendingCleanupSessions = new ConcurrentHashMap<>();
 
@@ -51,6 +62,8 @@ public class BashSandboxService {
     @Value("${bash-sandbox.session-cleanup-delay-ms:1800000}")
     private long sessionCleanupDelayMs;
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     @Autowired
     public BashSandboxService(McpHostService mcpHostService,
                               SandboxConfig config,
@@ -330,6 +343,7 @@ public class BashSandboxService {
         return config.isEnabled();
     }
 
+<<<<<<< HEAD
     // ==================== 延迟清理 ====================
 
     /**
@@ -417,6 +431,8 @@ public class BashSandboxService {
         log.info("待清理 bash-sandbox 会话清理完成");
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     // ==================== Phase 4: 高级功能 ====================
 
     /**
@@ -827,6 +843,7 @@ public class BashSandboxService {
         try {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
+<<<<<<< HEAD
                     : "";
 
             // bash-sandbox 返回格式化的 markdown 文本，尝试从中提取结构化数据
@@ -850,6 +867,24 @@ public class BashSandboxService {
                 // 不是 JSON，从 markdown 文本中提取信息
                 return parseMarkdownExecuteResult(content);
             }
+=======
+                    : "{}";
+            JsonNode data = objectMapper.readTree(content);
+
+            return ExecuteResult.builder()
+                    .success(data.path("success").asBoolean())
+                    .stdout(data.path("stdout").asText())
+                    .stderr(data.path("stderr").asText())
+                    .exitCode(data.path("exitCode").asInt())
+                    .executionTimeMs(data.path("executionTimeMs").asLong())
+                    .sessionId(data.path("sessionId").asText())
+                    .workingDirectory(data.path("workingDirectory").asText())
+                    .blocked(data.path("blocked").asBoolean())
+                    .blockedReason(data.path("blockedReason").asText(null))
+                    .error(data.path("error").asText(null))
+                    .timedOut(data.path("timedOut").asBoolean(false))
+                    .build();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         } catch (Exception e) {
             log.error("解析执行结果失败: {}", e.getMessage());
             return ExecuteResult.builder()
@@ -859,6 +894,7 @@ public class BashSandboxService {
         }
     }
 
+<<<<<<< HEAD
     /**
      * 从 bash-sandbox 返回的 markdown 格式文本中提取执行结果
      * bash-sandbox execute 工具返回格式化的 markdown，包含：
@@ -930,11 +966,14 @@ public class BashSandboxService {
         return text.substring(codeStart, codeEnd);
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private SessionInfo parseSessionInfo(McpToolCallResponse response) {
         try {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
                     : "{}";
+<<<<<<< HEAD
 
             // 先尝试 JSON 解析
             try {
@@ -976,12 +1015,35 @@ public class BashSandboxService {
                 log.error("无法从文本中提取会话信息: {}", content.substring(0, Math.min(content.length(), 200)));
                 return null;
             }
+=======
+            JsonNode data = objectMapper.readTree(content);
+
+            if (data.has("session")) {
+                JsonNode session = data.path("session");
+                return SessionInfo.builder()
+                        .sessionId(session.path("sessionId").asText())
+                        .workingDirectory(session.path("workingDirectory").asText())
+                        .createdAt(session.path("createdAt").asText())
+                        .lastActivityAt(session.path("lastActivityAt").asText())
+                        .name(session.path("name").asText(null))
+                        .commandCount(session.path("commandCount").asInt(0))
+                        .totalExecutionTimeMs(session.path("totalExecutionTimeMs").asLong(0))
+                        .build();
+            }
+
+            return SessionInfo.builder()
+                    .sessionId(data.path("sessionId").asText())
+                    .workingDirectory(data.path("workingDirectory").asText())
+                    .createdAt(data.path("createdAt").asText())
+                    .build();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         } catch (Exception e) {
             log.error("解析会话信息失败: {}", e.getMessage());
             return null;
         }
     }
 
+<<<<<<< HEAD
     /**
      * 从 Markdown 格式文本中提取键值
      * 支持格式: - key: `value` 或 key: "value" 或 key: value
@@ -1014,6 +1076,8 @@ public class BashSandboxService {
         return null;
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private List<SessionInfo> parseSessionList(McpToolCallResponse response) {
         try {
             String content = response.getContent() != null && !response.getContent().isEmpty()
@@ -1046,6 +1110,7 @@ public class BashSandboxService {
             String content = response.getContent() != null && !response.getContent().isEmpty()
                     ? response.getContent().get(0).getText()
                     : "{}";
+<<<<<<< HEAD
             try {
                 JsonNode data = objectMapper.readTree(content);
                 return data.path("success").asBoolean();
@@ -1058,6 +1123,10 @@ public class BashSandboxService {
                 }
                 return false;
             }
+=======
+            JsonNode data = objectMapper.readTree(content);
+            return data.path("success").asBoolean();
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         } catch (Exception e) {
             return false;
         }

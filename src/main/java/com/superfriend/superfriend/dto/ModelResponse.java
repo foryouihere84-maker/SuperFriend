@@ -15,6 +15,7 @@ public class ModelResponse {
     private Long totalTokens;
     private Double cost;
     private Long latencyMs;
+<<<<<<< HEAD
     private String finishReason;  // 完成原因: "stop", "length", "tool_calls", "error" 等
 
     public boolean hasToolCalls() {
@@ -39,4 +40,22 @@ public class ModelResponse {
     public boolean isTruncated() {
         return "length".equals(finishReason);
     }
+=======
+    
+    public boolean hasToolCalls() {
+        return toolCalls != null && !toolCalls.isEmpty();
+    }
+    
+    public boolean hasContent() {
+        return content != null && !content.isEmpty();
+    }
+    
+    public boolean hasReasoningContent() {
+        return reasoningContent != null && !reasoningContent.isEmpty();
+    }
+    
+    public boolean hasUsage() {
+        return inputTokens != null || outputTokens != null;
+    }
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 }

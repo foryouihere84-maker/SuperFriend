@@ -119,6 +119,7 @@ public class SkillManager {
 
     private void loadSystemSkills() {
         try {
+<<<<<<< HEAD
             // 首先尝试从外部目录加载（生产环境推荐）
             File skillsDir = new File(systemSkillsPath);
             if (skillsDir.exists() && skillsDir.isDirectory()) {
@@ -154,10 +155,28 @@ public class SkillManager {
 
             log.warn("系统技能目录不存在: {} (绝对路径: {})", systemSkillsPath, skillsDir.getAbsolutePath());
         } catch (Exception e) {
+=======
+            File skillsDir = new File(systemSkillsPath);
+            if (skillsDir.exists() && skillsDir.isDirectory()) {
+                loadSkillsFromDirectory(skillsDir, SkillMetadata.SkillScope.SYSTEM);
+                log.info("已从文件系统加载系统技能: {}", skillsDir.getAbsolutePath());
+            } else {
+                Resource resource = new ClassPathResource(systemSkillsPath);
+                if (resource.exists()) {
+                    skillsDir = resource.getFile();
+                    loadSkillsFromDirectory(skillsDir, SkillMetadata.SkillScope.SYSTEM);
+                    log.info("已从classpath加载系统技能");
+                } else {
+                    log.warn("系统技能目录不存在: {} (绝对路径: {})", systemSkillsPath, skillsDir.getAbsolutePath());
+                }
+            }
+        } catch (IOException e) {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             log.warn("加载系统技能失败: {}", e.getMessage());
         }
     }
 
+<<<<<<< HEAD
     /**
      * 从 JAR 内解压技能到外部目录
      * 解决 JAR 部署时无法直接访问 classpath 资源的问题
@@ -185,6 +204,8 @@ public class SkillManager {
         }
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private void loadProjectSkills() {
         try {
             Path projectSkillsDir = Paths.get(projectSkillsPath);
@@ -403,12 +424,16 @@ public class SkillManager {
                             log.warn("Invalid timeout value: {}", yamlData.get("timeout"));
                         }
                     }
+<<<<<<< HEAD
 
                     // 解析执行器配置
                     if (yamlData.containsKey("executor")) {
                         parseExecutorConfig(config, yamlData.get("executor"));
                     }
 
+=======
+                    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                     if (!remainingContent.isEmpty()) {
                         config.setInstructions(remainingContent);
                     }
@@ -499,6 +524,7 @@ public class SkillManager {
         }
     }
 
+<<<<<<< HEAD
     /**
      * 解析执行器配置
      */
@@ -610,6 +636,8 @@ public class SkillManager {
         return pc;
     }
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private SkillConfig parseYamlSkill(File yamlFile) throws IOException {
         return yamlMapper.readValue(yamlFile, SkillConfig.class);
     }

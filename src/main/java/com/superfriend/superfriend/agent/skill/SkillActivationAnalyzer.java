@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @Component
 public class SkillActivationAnalyzer {
+<<<<<<< HEAD
 
     @Value("${skills.activation.default-threshold:0.3}")
     private double defaultThreshold = 0.3;
@@ -27,6 +28,23 @@ public class SkillActivationAnalyzer {
 
     @Value("${skills.activation.context-score-weight:0.1}")
     private double contextScoreWeight = 0.1;
+=======
+    
+    @Value("${skills.activation.default-threshold:0.3}")
+    private double defaultThreshold;
+    
+    @Value("${skills.activation.base-score-weight:0.2}")
+    private double baseScoreWeight;
+    
+    @Value("${skills.activation.use-when-score-weight:0.4}")
+    private double useWhenScoreWeight;
+    
+    @Value("${skills.activation.keyword-score-weight:0.3}")
+    private double keywordScoreWeight;
+    
+    @Value("${skills.activation.context-score-weight:0.1}")
+    private double contextScoreWeight;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     
     private static final Pattern USE_WHEN_PATTERN = Pattern.compile(
         "USE WHEN\\s+(.+?)(?=\\n|$)", 

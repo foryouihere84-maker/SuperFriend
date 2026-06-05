@@ -14,9 +14,15 @@ public class SmartCompressionStrategy {
 
     private static final int TOKEN_ESTIMATE_RATIO = 4;
     private static final int MIN_MESSAGES_TO_KEEP = 5;
+<<<<<<< HEAD
     private static final int MAX_TOOL_RESULT_LENGTH = 5000;
     private static final int MAX_ERROR_LENGTH = 5000;
     private static final int MAX_SEARCH_RESULT_LENGTH = 5000;
+=======
+    private static final int MAX_TOOL_RESULT_LENGTH = 3000;
+    private static final int MAX_ERROR_LENGTH = 500;
+    private static final int MAX_SEARCH_RESULT_LENGTH = 2000;
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     
     private static final Pattern ERROR_PATTERN = Pattern.compile(
         "(?i)(error|exception|failed|failure|timeout|超时|失败|错误)"

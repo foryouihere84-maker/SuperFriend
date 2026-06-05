@@ -2,6 +2,7 @@ package com.superfriend.superfriend.agent.error;
 
 import org.springframework.stereotype.Component;
 import java.util.*;
+<<<<<<< HEAD
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -60,18 +61,32 @@ public class ErrorRecoveryManager {
         }
     }
 
+=======
+
+@Component
+public class ErrorRecoveryManager {
+    
+    private final ErrorDiagnoser diagnoser;
+    private final Map<String, RecoveryStrategy> recoveryStrategies;
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public ErrorRecoveryManager(ErrorDiagnoser diagnoser) {
         this.diagnoser = diagnoser;
         this.recoveryStrategies = new HashMap<>();
         initializeRecoveryStrategies();
     }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     private void initializeRecoveryStrategies() {
         recoveryStrategies.put(ErrorType.NETWORK_ERROR.name(), new NetworkRecoveryStrategy());
         recoveryStrategies.put(ErrorType.TIMEOUT_ERROR.name(), new TimeoutRecoveryStrategy());
         recoveryStrategies.put(ErrorType.AUTHENTICATION_ERROR.name(), new AuthenticationRecoveryStrategy());
         recoveryStrategies.put(ErrorType.RATE_LIMIT_ERROR.name(), new RateLimitRecoveryStrategy());
         recoveryStrategies.put(ErrorType.SERVER_ERROR.name(), new ServerErrorRecoveryStrategy());
+<<<<<<< HEAD
         recoveryStrategies.put(ErrorType.VALIDATION_ERROR.name(), new ValidationErrorRecoveryStrategy());
         recoveryStrategies.put(ErrorType.RESOURCE_NOT_FOUND.name(), new ResourceNotFoundRecoveryStrategy());
         recoveryStrategies.put(ErrorType.PERMISSION_DENIED.name(), new PermissionDeniedRecoveryStrategy());
@@ -180,19 +195,42 @@ public class ErrorRecoveryManager {
         return failureCountMap.getOrDefault(key, 0);
     }
 
+=======
+    }
+    
+    public RecoveryResult attemptRecovery(String errorMessage, String componentName, 
+                                           Map<String, Object> context) {
+        ErrorDiagnosis diagnosis = diagnoser.diagnose(errorMessage, componentName, context);
+        RecoveryStrategy strategy = recoveryStrategies.get(diagnosis.getErrorRecord().getErrorType().name());
+        
+        if (strategy == null) {
+            return RecoveryResult.failure("No recovery strategy available for this error type");
+        }
+        
+        return strategy.recover(diagnosis, context);
+    }
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public boolean shouldRetry(ErrorType errorType) {
         switch (errorType) {
             case NETWORK_ERROR:
             case TIMEOUT_ERROR:
             case RATE_LIMIT_ERROR:
             case SERVER_ERROR:
+<<<<<<< HEAD
             case VALIDATION_ERROR:
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 return true;
             default:
                 return false;
         }
     }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public int getMaxRetryAttempts(ErrorType errorType) {
         switch (errorType) {
             case NETWORK_ERROR:
@@ -202,13 +240,20 @@ public class ErrorRecoveryManager {
                 return 5;
             case SERVER_ERROR:
                 return 2;
+<<<<<<< HEAD
             case VALIDATION_ERROR:
                 return 2;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             default:
                 return 0;
         }
     }
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     public long getRetryDelay(ErrorType errorType, int attempt) {
         switch (errorType) {
             case NETWORK_ERROR:
@@ -219,12 +264,16 @@ public class ErrorRecoveryManager {
                 return 5000 * attempt;
             case SERVER_ERROR:
                 return 3000 * attempt;
+<<<<<<< HEAD
             case VALIDATION_ERROR:
                 return 500;
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
             default:
                 return 1000;
         }
     }
+<<<<<<< HEAD
 
     /**
      * 获取替代工具建议
@@ -254,4 +303,6 @@ public class ErrorRecoveryManager {
             ", TotalFailures=" + totalFailures +
             ", RecoveryLevel=" + level.getDescription());
     }
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 }

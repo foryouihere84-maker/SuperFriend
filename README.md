@@ -4,12 +4,15 @@
 
 SuperFriend 是一个基于 Spring Boot 的全栈 AI Agent 平台，支持自定义技能（Skills）、MCP 协议服务、安全沙箱执行，以及 Word/PPT/Excel/PDF 等文档的生成与解析。通过多模态对话、知识图谱、记忆宫殿等能力，为用户提供强大的智能助手体验。
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image.png" alt="SuperFriend 主界面" width="800">
   <br>
   <em>SuperFriend 主界面 — AI 对话与智能交互</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 ---
 
 ## 核心特性
@@ -18,12 +21,15 @@ SuperFriend 是一个基于 Spring Boot 的全栈 AI Agent 平台，支持自定
 
 SuperFriend 实现了完整的 [Agent Skills 协议](https://agentskills.io/specification)，兼容 Anthropic Skills、Pi Skills、OpenClaw Skills 等主流技能规范。
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-1.png" alt="技能管理界面" width="800">
   <br>
   <em>技能管理 — 查看、创建、配置自定义技能</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 - **技能发现与加载**：启动时自动扫描 `skills/system/` 和 `skills/users/{user_id}/` 目录，解析 `SKILL.md` 元数据
 - **渐进式加载**：三级加载策略 — 元数据（始终在上下文）→ SKILL.md 正文（触发时加载）→ 捆绑资源（按需加载）
 - **技能执行器**：支持 `script`（脚本执行）和 `command`（命令模板）两种执行模式，兼容 Python / Node / Bash / .NET 运行时
@@ -36,12 +42,15 @@ SuperFriend 实现了完整的 [Agent Skills 协议](https://agentskills.io/spec
 
 SuperFriend 内置 MCP（Model Context Protocol）Host，统一管理和调度外部工具服务。
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-2.png" alt="MCP 服务器管理" width="800">
   <br>
   <em>MCP 服务器管理 — 配置、监控和管理 MCP 工具服务</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 - **MCP Host 服务**：`McpHostService` 负责服务发现、生命周期管理、工具调用路由
 - **内置 MCP 服务**：
   - `bash-sandbox` — 安全沙箱命令执行（详见下方）
@@ -73,12 +82,15 @@ SuperFriend 内置 MCP（Model Context Protocol）Host，统一管理和调度�
 
 SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内置 Skills 实现。
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-3.png" alt="文档生成与解析" width="800">
   <br>
   <em>文档生成 — 通过对话指令生成 Word / Excel / PPT / PDF 文档</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 #### Word 文档（DOCX）
 
 - **创建**：基于 OpenXML SDK (.NET)，支持报告、信函、备忘录、学术论文等类型
@@ -127,12 +139,15 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
 
 ### AI 对话系统
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-4.png" alt="AI 对话界面" width="800">
   <br>
   <em>AI 对话 — 多模型流式对话，支持文件上传与多轮交互</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 - **多模型支持**：兼容 OpenAI API 格式，支持 GPT-4、GPT-4o 等多种模型，用户可自定义模型配置
 - **流式响应**：SSE（Server-Sent Events）实时推送对话内容
 - **多模式聊天**：
@@ -154,12 +169,15 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
 
 ### 知识图谱
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-5.png" alt="知识图谱" width="800">
   <br>
   <em>知识图谱 — 可视化节点关系，语义搜索知识网络</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 - **节点管理**：创建、更新、删除知识节点，支持语义搜索
 - **关系管理**：节点间的关联关系，构建知识网络
 - **上下文生成**：根据对话自动提取和关联知识，生成上下文注入 LLM
@@ -182,18 +200,22 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
 
 ### 费用追踪
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/image-6.png" alt="Token 费用统计" width="800">
   <br>
   <em>Token 统计 — 实时追踪 API 调用成本与 Token 消耗</em>
 </p>
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 - **模型定价**：内置主流模型定价表，支持自定义定价
 - **实时统计**：按会话、用户、日期维度统计 Token 用量和费用
 - **SSE 推送**：费用变化实时推送到前端
 
 ### LLM 监控
 
+<<<<<<< HEAD
 <p align="center">
   <img src="screenshots/大模型调用记录追踪.png" alt="LLM 调用追踪" width="800">
   <br>
@@ -223,6 +245,11 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
   <em>模型配置 — 管理 OpenAI / DeepSeek / Ollama 等多种 AI 模型</em>
 </p>
 
+=======
+- **调用记录**：`LLMCallMonitorService` 记录每次 LLM 调用的详细信息
+- **监控面板**：前端实时展示 LLM 调用状态、延迟、Token 消耗
+
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 ### 系统内置 Skills
 
 | 技能 | 说明 |
@@ -247,6 +274,7 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
 
 ---
 
+<<<<<<< HEAD
 ## 界面展示
 
 <p align="center">
@@ -259,6 +287,8 @@ SuperFriend 提供完整的 Office 文档和 PDF 生成/解析能力，通过内
 
 ---
 
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
 ## 技术栈
 
 ### 后端

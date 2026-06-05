@@ -478,6 +478,7 @@ public class SkillRecommendationService {
     }
 
     private String callAI(AIModelConfig config, String systemPrompt, String userPrompt) throws Exception {
+<<<<<<< HEAD
         return callAI(config, systemPrompt, userPrompt, 500, null, null);
     }
 
@@ -486,6 +487,12 @@ public class SkillRecommendationService {
     }
 
     private String callAI(AIModelConfig config, String systemPrompt, String userPrompt, int maxTokens, String sessionId, Long userId) throws Exception {
+=======
+        return callAI(config, systemPrompt, userPrompt, 500);
+    }
+
+    private String callAI(AIModelConfig config, String systemPrompt, String userPrompt, int maxTokens) throws Exception {
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
         List<Map<String, Object>> messages = new ArrayList<>();
         Map<String, Object> sysMsg = new HashMap<>();
         sysMsg.put("role", "system");
@@ -501,8 +508,11 @@ public class SkillRecommendationService {
                 .messages(messages)
                 .temperature(0.3)
                 .maxTokens(maxTokens)
+<<<<<<< HEAD
                 .sessionId(sessionId)
                 .userId(userId)
+=======
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
                 .build();
 
         log.info("[SkillRecommendation] 调用 LLM (chatComplete): model={}, maxTokens={}", config.getModelId(), maxTokens);

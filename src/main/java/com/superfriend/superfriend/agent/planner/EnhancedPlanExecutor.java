@@ -529,6 +529,7 @@ public class EnhancedPlanExecutor {
     }
 
     public enum StepStatus {
+<<<<<<< HEAD
         PENDING("待执行"),
         WAITING_FOR_RESOURCE("等待资源"),
         WAITING_FOR_USER_INPUT("等待用户输入"),
@@ -604,6 +605,13 @@ public class EnhancedPlanExecutor {
             return this == RUNNING || this == RETRYING ||
                    this == WAITING_FOR_RESOURCE || this == WAITING_FOR_USER_INPUT;
         }
+=======
+        PENDING,
+        RUNNING,
+        COMPLETED,
+        FAILED,
+        SKIPPED
+>>>>>>> 60f6cf48ec8b86bef14fa75f9b08190db2685fc2
     }
 
     @Data
