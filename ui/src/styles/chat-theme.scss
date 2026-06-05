@@ -1,0 +1,298 @@
+/**
+ * Chat 主题 - 使用 CSS 变量实现动态主题切换
+ *
+ * 注意：这些变量在 sf-theme.scss 中也有定义
+ * 此文件保留用于 Chat 页面特定的样式
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Sora:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Pacifico&family=Dancing+Script:wght@400;500;600;700&family=Great+Vibes&display=swap');
+
+// ============================================
+// CSS 变量 - 亮色模式（默认）
+// ============================================
+:root {
+  // Chat 背景色
+  --chat-bg-deep: #f8f9fc;
+  --chat-bg-primary: #ffffff;
+  --chat-bg-secondary: #f1f3f8;
+  --chat-bg-elevated: #ffffff;
+  --chat-bg-hover: #e8ebf2;
+
+  // Chat 表面（玻璃效果）
+  --chat-surface-glass: rgba(0, 0, 0, 0.02);
+  --chat-surface-glass-hover: rgba(0, 0, 0, 0.04);
+  --chat-surface-glass-active: rgba(0, 0, 0, 0.06);
+
+  // Chat 边框
+  --chat-border-subtle: rgba(0, 0, 0, 0.06);
+  --chat-border-default: rgba(0, 0, 0, 0.1);
+  --chat-border-strong: rgba(0, 0, 0, 0.15);
+
+  // Chat 文字色
+  --chat-text-primary: #1a1a2e;
+  --chat-text-secondary: #4a4a68;
+  --chat-text-tertiary: #6b6b88;
+  --chat-text-muted: #9898a8;
+
+  // Chat 强调色
+  --chat-accent-purple: #7c3aed;
+  --chat-accent-purple-light: #8b5cf6;
+  --chat-accent-purple-dark: #6d28d9;
+  --chat-accent-cyan: #0891b2;
+  --chat-accent-cyan-light: #06b6d4;
+  --chat-accent-pink: #db2777;
+  --chat-accent-green: #059669;
+  --chat-accent-orange: #d97706;
+  --chat-accent-red: #dc2626;
+
+  // Chat 渐变
+  --chat-gradient-primary: linear-gradient(135deg, var(--chat-accent-purple) 0%, var(--chat-accent-cyan) 100%);
+  --chat-gradient-secondary: linear-gradient(135deg, var(--chat-accent-pink) 0%, var(--chat-accent-purple) 100%);
+  --chat-gradient-success: linear-gradient(135deg, var(--chat-accent-green) 0%, var(--chat-accent-cyan) 100%);
+  --chat-gradient-glow: linear-gradient(135deg, rgba(124, 58, 237, 0.1) 0%, rgba(8, 145, 178, 0.1) 100%);
+
+  // Chat 页面背景
+  --chat-page-bg: #f5f7fc;
+  --chat-page-gradient:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.08), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(139, 92, 246, 0.05), transparent),
+    radial-gradient(ellipse 50% 30% at 0% 80%, rgba(59, 130, 246, 0.03), transparent);
+  --chat-page-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+
+  // Chat 阴影
+  --chat-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+  --chat-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.1);
+  --chat-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --chat-shadow-glow-purple: 0 0 20px rgba(124, 58, 237, 0.2);
+  --chat-shadow-glow-cyan: 0 0 20px rgba(8, 145, 178, 0.2);
+
+  // Chat 圆角
+  --chat-radius-sm: 6px;
+  --chat-radius-md: 10px;
+  --chat-radius-lg: 14px;
+  --chat-radius-xl: 20px;
+  --chat-radius-full: 9999px;
+
+  // Chat 字体
+  --chat-font-display: 'Sora', system-ui, sans-serif;
+  --chat-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --chat-font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  // Chat 过渡
+  --chat-transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --chat-transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --chat-transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --chat-transition-spring: 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+// ============================================
+// CSS 变量 - 深色模式
+// ============================================
+:root.dark {
+  // Chat 背景色
+  --chat-bg-deep: #06060a;
+  --chat-bg-primary: #0c0c12;
+  --chat-bg-secondary: #12121a;
+  --chat-bg-elevated: #1a1a24;
+  --chat-bg-hover: #22222e;
+
+  // Chat 表面（玻璃效果）
+  --chat-surface-glass: rgba(255, 255, 255, 0.03);
+  --chat-surface-glass-hover: rgba(255, 255, 255, 0.06);
+  --chat-surface-glass-active: rgba(255, 255, 255, 0.08);
+
+  // Chat 边框
+  --chat-border-subtle: rgba(255, 255, 255, 0.06);
+  --chat-border-default: rgba(255, 255, 255, 0.1);
+  --chat-border-strong: rgba(255, 255, 255, 0.15);
+
+  // Chat 文字色
+  --chat-text-primary: #f5f5fa;
+  --chat-text-secondary: #c8c8d8;
+  --chat-text-tertiary: #9898a8;
+  --chat-text-muted: #787888;
+
+  // Chat 强调色
+  --chat-accent-purple: #8b5cf6;
+  --chat-accent-purple-light: #a78bfa;
+  --chat-accent-purple-dark: #7c3aed;
+  --chat-accent-cyan: #06b6d4;
+  --chat-accent-cyan-light: #22d3ee;
+  --chat-accent-pink: #ec4899;
+  --chat-accent-green: #10b981;
+  --chat-accent-orange: #f59e0b;
+  --chat-accent-red: #ef4444;
+
+  // Chat 渐变
+  --chat-gradient-primary: linear-gradient(135deg, var(--chat-accent-purple) 0%, var(--chat-accent-cyan) 100%);
+  --chat-gradient-secondary: linear-gradient(135deg, var(--chat-accent-pink) 0%, var(--chat-accent-purple) 100%);
+  --chat-gradient-success: linear-gradient(135deg, var(--chat-accent-green) 0%, var(--chat-accent-cyan) 100%);
+  --chat-gradient-glow: linear-gradient(135deg, rgba(139, 92, 246, 0.15) 0%, rgba(6, 182, 212, 0.15) 100%);
+
+  // Chat 页面背景
+  --chat-page-bg: #0d0d14;
+  --chat-page-gradient:
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(120, 119, 198, 0.12), transparent),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(139, 92, 246, 0.06), transparent),
+    radial-gradient(ellipse 50% 30 at 0% 80%, rgba(59, 130, 246, 0.04), transparent);
+  --chat-page-noise: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+
+  // Chat 阴影
+  --chat-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --chat-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --chat-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --chat-shadow-glow-purple: 0 0 20px rgba(139, 92, 246, 0.3);
+  --chat-shadow-glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
+}
+
+// ============================================
+// Mixins
+// ============================================
+
+@mixin glass-surface {
+  background: var(--chat-surface-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--chat-border-subtle);
+}
+
+@mixin glass-surface-hover {
+  background: var(--chat-surface-glass-hover);
+  border-color: var(--chat-border-default);
+}
+
+@mixin page-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 0;
+  overflow: hidden;
+
+  .bg-gradient {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--chat-page-gradient);
+  }
+
+  .bg-grid {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image:
+      linear-gradient(var(--chat-border-subtle) 1px, transparent 1px),
+      linear-gradient(90deg, var(--chat-border-subtle) 1px, transparent 1px);
+    background-size: 60px 60px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 50%, black, transparent);
+  }
+
+  .bg-noise {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    opacity: 0.15;
+    background-image: var(--chat-page-noise);
+    pointer-events: none;
+  }
+}
+
+@mixin page-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+  background: var(--chat-page-bg);
+}
+
+@mixin page-main {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+}
+
+@mixin glow-border($color: var(--chat-accent-purple)) {
+  box-shadow: 0 0 0 1px color-mix(in srgb, $color 30%, transparent), 0 0 20px color-mix(in srgb, $color 10%, transparent);
+}
+
+@mixin text-gradient {
+  background: var(--chat-gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+@mixin animate-fade-in {
+  animation: chatFadeIn 0.3s ease-out forwards;
+}
+
+@mixin animate-slide-up {
+  animation: chatSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@mixin animate-pulse {
+  animation: chatPulse 2s ease-in-out infinite;
+}
+
+// ============================================
+// 动画
+// ============================================
+
+@keyframes chatFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes chatSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes chatPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes chatGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.5), 0 0 60px rgba(6, 182, 212, 0.2);
+  }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes typing {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
