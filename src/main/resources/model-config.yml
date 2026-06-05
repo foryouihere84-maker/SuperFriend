@@ -6,16 +6,16 @@
 tencent:
   ocr:
     enabled: true
-    secret-id: AKID98uSnt0ubNvGMDsMcorhhe094lETZQ6Z
-    secret-key: JOFtLcfOwJTYTDk4HTaWGvWvBKG0MVQ8
-    region: ap-beijing
+    secret-id: 
+    secret-key: 
+    region: 
 
   # 腾讯云 ASR 服务配置
   asr:
     enabled: true
-    secret-id: AKIDkKeiV2II2ViTyDBtLWR5TaQ0KNAhyzlG
-    secret-key: GFyQbcNr52jALGvKTLxJPFo8C0Xprd9P
-    region: ap-beijing
+    secret-id: 
+    secret-key: 
+    region: 
 
 # Stable Diffusion 图片生成配置
 sd:
