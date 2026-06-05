@@ -1,0 +1,47 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${user.home}", "${java.io.tmpdir}/superfriend_sandbox/shared"],
+      "env": {},
+      "disabled": false,
+      "timeout": 60000,
+      "description": "【文件系统工具】官方文件操作服务，支持读写文件、创建目录、列出目录、搜索文件等。已包含沙箱共享目录访问权限。"
+    },
+    "sequentialthinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+      "env": {},
+      "disabled": false,
+      "timeout": 60000,
+      "description": "【顺序思考工具】官方思维链服务，支持动态和反思性问题解决。"
+    },
+    "fetch": {
+      "command": "python",
+      "args": ["-m", "mcp_server_fetch", "--ignore-robots-txt"],
+      "env": {},
+      "disabled": false,
+      "timeout": 60000,
+      "description": "【网络请求工具】官方 HTTP 请求服务，支持网页内容抓取、API 调用等。"
+    },
+    "time": {
+      "command": "python",
+      "args": ["-m", "mcp_server_time"],
+      "env": {},
+      "disabled": false,
+      "timeout": 30000,
+      "description": "【时间工具】官方时间服务，支持获取当前时间、时区转换等。"
+    },
+    "bash-sandbox": {
+      "command": "node",
+      "args": ["${env.BASH_SANDBOX_PATH:${user.dir}/src/main/resources/mcp-servers/bash-sandbox/dist/index.js}"],
+      "env": {
+        "SANDBOX_ROOT_DIR": "${java.io.tmpdir}/superfriend_sandbox",
+        "SANDBOX_ROOT_DIR_WIN": "${java.io.tmpdir}/superfriend_sandbox"
+      },
+      "disabled": false,
+      "timeout": 300000,
+      "description": "【Bash沙箱工具】安全的命令执行服务，支持会话管理、资源限制、命令过滤、命令模板、输出解析、批量执行和命令建议。注意：避免使用'find /'等遍历整个文件系统的命令，使用'find . -name'或filesystem工具的search_files代替。"
+    }
+  }
+}

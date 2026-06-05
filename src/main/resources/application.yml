@@ -1,0 +1,270 @@
+spring:
+  application:
+    name: superfriend
+  config:
+    import: classpath:model-config.yml
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 100MB
+      file-size-threshold: 2KB
+  datasource:
+    url: jdbc:mysql://localhost:3306/superfriend
+    username: root
+    password: 123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+  # 异步任务线程池配置（针对4核4G服务器优化）
+  task:
+    execution:
+      pool:
+        core-size: 8
+        max-size: 16
+        queue-capacity: 40
+        keep-alive: 60s
+      thread-name-prefix: sf-async-
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.superfriend.superfriend.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: superfriend-secret-key-2024-very-long-key-for-jwt-token-generation-must-be-at-least-256-bits-long
+  expiration: 604800000
+
+
+
+server:
+  port: 8080
+  servlet:
+    context-path: /
+  tomcat:
+    connection-timeout: 300000
+    # Tomcat 线程池配置（针对4核4G服务器优化）
+    threads:
+      max: 100
+      min-spare: 10
+    # 最大连接数
+    max-connections: 200
+    # 接受队列长度
+    accept-count: 50
+  mvc:
+    async:
+      request-timeout: 300000
+
+# Springdoc OpenAPI (Swagger) 配置
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: alpha
+    tags-sorter: alpha
+
+# MCP Host 配置
+mcp:
+  host:
+    # 空闲超时时间（毫秒），默认 10 分钟
+    idle-timeout-ms: 6000000
+    # 是否启用空闲检测（true=启用，false=禁用，禁用后服务器将永久持有直到应用重启）
+    enable-idle-check: false
+  # MCP 配置文件路径（可选，用于部署环境）
+  config-path: ${MCP_CONFIG_PATH:}
+  # MCP 本地存储路径（用于缓存下载的 npm/python 包）
+  local-store-path: ${MCP_LOCAL_STORE_PATH:src/main/resources/mcp-local}
+  # npm 镜像源（可选，用于加速下载）
+  npm-registry: ${NPM_REGISTRY:}
+  # PyPI 镜像源（可选，用于加速下载）
+  pypi-index: ${PYPI_INDEX:}
+
+# Skills 配置
+skills:
+  system:
+    path: skills/system
+  project:
+    path: skills/project
+
+# 统一文件路径配置
+app:
+  file:
+    # 临时文件目录（用户上传等）
+    temp-dir: uploads/temp
+    # 沙箱根目录（默认使用系统临时目录）
+    sandbox-dir: ${java.io.tmpdir}/superfriend_sandbox
+    # 技能目录
+    skills-dir: ${skills.system.path}
+    # 执行追踪目录
+    trace-dir: traces
+    # 导出目录
+    export-dir: ${java.io.tmpdir}/superfriend_sandbox/exports
+    # 共享目录
+    shared-dir: ${java.io.tmpdir}/superfriend_sandbox/shared
+    # 临时文件 TTL（小时）
+    temp-file-ttl-hours: 24
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.superfriend.superfriend.service: DEBUG
+
+# 可观测性配置
+observability:
+  langfuse:
+    enabled: false
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+    host: https://cloud.langfuse.com
+  arize:
+    enabled: false
+    api-key: ${ARIZE_API_KEY:}
+    space-id: ${ARIZE_SPACE_ID:}
+    model-id: superfriend-agent
+
+# 成本追踪配置
+cost-tracking:
+  enabled: true
+  daily-budget: 10.0
+  monthly-budget: 100.0
+  alert-threshold: 0.8
+
+# 知识提取配置
+knowledge:
+  extraction:
+    # 触发知识提取的最小消息数量
+    min-messages: 1
+    # 分析的最大消息数量（从最近的开始）
+    max-messages-to-analyze: 15
+    # 是否在对话结束时自动提取（推荐 true）
+    auto-extract-on-finalize: true
+    # 是否在每次保存时提取（不推荐，会产生重复）
+    auto-extract-on-save: false
+    # 触发知识提取的最小文本长度（字符数，包含用户输入和AI回复）
+    min-text-length: 2000
+    # 是否启用文本长度触发（与消息数量触发是"或"的关系）
+    enable-text-length-trigger: true
+    # 延迟执行时间（秒）
+    delay-seconds: 900
+
+
+aliyun:
+  oss:
+    enabled: true
+    endpoint: oss-cn-beijing.aliyuncs.com
+    access-key-id: YOUR_ALIYUN_ACCESS_KEY
+    access-key-secret: YOUR_TENCENT_SECRET_ID
+    bucket-name: superfriend-skills-for-user-resource
+
+# OrioSearch 配置（自托管搜索聚合器）
+oriosearch:
+  enabled: true
+  base-url: http://localhost:8000
+  timeout-ms: 15000
+  max-results: 5
+  include-answer: true
+  rerank-results: false
+
+# 热点新闻配置
+news:
+  oriosearch:
+    # 时间过滤范围: day, week, month, year
+    time-range: day
+    # 搜索关键词（逗号分隔）
+    queries: AI 人工智能,科技新闻,互联网热点
+    # 指定搜索引擎（可选），如 "bing news"，留空则使用默认引擎
+    engines:
+
+# 腾讯云 COS 配置
+tencent:
+  cos:
+    enabled: true
+    secret-id: YOUR_TENCENT_SECRET_ID
+    secret-key: YOUR_TENCENT_SECRET_ID
+    bucket-name: sf-skills-resource-1420445939
+    region: ap-beijing
+
+# 节点丰富化配置
+node-enrichment:
+  enabled: true
+  # 头像最大大小（字节）
+  avatar-max-size: 1048576
+  # 相关图片最大大小（字节）
+  image-max-size: 3145728
+  # 相关图片数量
+  image-count: 2
+
+# 智谱 AI 配置（图片/音频/视频生成）
+zhipu:
+  api:
+    enabled: true
+    key: your_api_key
+  image:
+    model: cogview-4
+    default-size: 1024x1024
+  audio:
+    model: glm-tts
+    default-voice: female
+    default-speed: 1.0
+    default-format: mp3
+  video:
+    model: cogvideox-2
+    poll-interval-ms: 5000
+    timeout-ms: 600000
+
+# Stable Diffusion 配置（图片生成 - 本地部署）
+sd:
+  api:
+    enabled: false
+    url: http://localhost:7860
+    key: ""
+  default:
+    steps: 30
+    cfg-scale: 7.0
+    width: 512
+    height: 512
+    sampler: "Euler a"
+    negative-prompt: ""
+
+# Bash 沙箱配置
+# 生产环境部署说明：
+# 1. 将 src/main/resources/mcp-servers/bash-sandbox 目录复制到服务器
+# 2. 设置环境变量 BASH_SANDBOX_PATH 指向 dist/index.js 的完整路径
+#    例如: export BASH_SANDBOX_PATH=/opt/superfriend/mcp-servers/bash-sandbox/dist/index.js
+# 3. 或者将 bash-sandbox 发布为 npm 包，修改 mcp-servers-config.json 使用 npx 启动
+bash-sandbox:
+  # 是否启用 Bash 沙箱
+  enabled: true
+  # Linux 环境下的沙箱根目录
+  root-dir: /tmp/superfriend_sandbox
+  # Windows 环境下的沙箱根目录（默认使用系统临时目录）
+  windows-root-dir: ${java.io.tmpdir}/superfriend_sandbox
+  # 共享目录（用于与其他 MCP 工具共享文件）
+  # 默认为 {root-dir}/shared
+  shared-dir: ${java.io.tmpdir}/superfriend_sandbox/shared
+  # 导出目录（用于导出沙箱文件）
+  # 默认为 {root-dir}/exports
+  export-dir: ${java.io.tmpdir}/superfriend_sandbox/exports
+  # 默认命令执行超时时间（毫秒）
+  default-timeout-ms: 60000
+  # 最大并发会话数
+  max-concurrent-sessions: 10
+  # 资源预留比例（0.0 - 1.0）
+  resource-reserve-ratio: 0.2
+  # 会话超时时间（毫秒），默认 30 分钟
+  session-timeout-ms: 1800000
+  # 会话文件延迟清理时间（毫秒），对话结束后保留文件一段时间再删除，默认 30 分钟
+  session-cleanup-delay-ms: 1800000
+  # 最大命令长度
+  max-command-length: 8192
+  # 最大输出大小（字节），默认 10MB
+  max-output-bytes: 10485760
+  # 是否在 Windows 上禁用沙箱
+  disable-on-windows: false
+  # MCP Server 名称
+  mcp-server-name: bash-sandbox
