@@ -35,7 +35,7 @@ mybatis:
     map-underscore-to-camel-case: true
 
 jwt:
-  secret: superfriend-secret-key-2024-very-long-key-for-jwt-token-generation-must-be-at-least-256-bits-long
+  secret: 
   expiration: 604800000
 
 
@@ -201,7 +201,7 @@ node-enrichment:
 zhipu:
   api:
     enabled: true
-    key: 4d77929925d3414795ea79b5b0976972.RFdbwaAsNtvR6RqO
+    key: your-key
   image:
     model: cogview-4
     default-size: 1024x1024
